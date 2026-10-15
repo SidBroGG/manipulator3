@@ -28,7 +28,7 @@
   </asset>
 
   <worldbody>
-    <body name="base_link" pos="0 0 0.066536">
+    <body name="base_link" pos="0 0 0.066536" euler="0 0 3.14159265">
       <geom class="visual" mesh="base_stand"/>
       <geom class="collision" mesh="base_stand"/>
 
@@ -57,8 +57,9 @@
                 <geom class="visual" mesh="gripper_base" pos="0.013 0 -0.3665"/>
                 <geom class="collision" mesh="gripper_base" pos="0.013 0 -0.3665"/>
 
-                <!-- OV5647 Camera (62.2 deg horizontal FOV, aligned with gripper squeeze axis) -->
-                <camera name="gripper_camera" pos="0 0 0.048" xyaxes="0 1 0 1 0 0" fovy="48.8"/>
+                <!-- OV5647 Camera (62.2 deg horizontal FOV, mounted on top of gripper) -->
+                <camera name="gripper_camera" pos="0 0 0.048" xyaxes="0 -1 0 -1 0 0" fovy="48.8"/>
+
 
                 <!-- VL53L0X ToF rangefinder site (pointing +Z along gripper approach axis) -->
                 <site name="tof_site" pos="0 0 0.048" size="0.004" rgba="1 0 0 0.8"/>

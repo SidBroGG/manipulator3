@@ -79,10 +79,11 @@ def test_tof_rangefinder_accuracy_and_approach():
         # Higher angles pitch shoulder and elbow down
         distances = []
         for phase in [0.4, 0.7, 1.0]:
-            sim.data.ctrl[sim.actuator_map["act_revolute_2"]] = 0.2 + 0.65 * phase
-            sim.data.ctrl[sim.actuator_map["act_revolute_3"]] = 0.1 + 0.45 * phase
-            sim.data.ctrl[sim.actuator_map["act_revolute_4"]] = -0.2 - 1.25 * phase
+            sim.data.ctrl[sim.actuator_map["act_revolute_2"]] = -0.2 - 0.65 * phase
+            sim.data.ctrl[sim.actuator_map["act_revolute_3"]] = -0.1 - 0.45 * phase
+            sim.data.ctrl[sim.actuator_map["act_revolute_4"]] = 0.2 + 1.25 * phase
             sim.step(150)
+
             dist = sim.get_tof_reading()
             if dist > 0:
                 distances.append(dist)
