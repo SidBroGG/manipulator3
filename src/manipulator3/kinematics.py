@@ -27,9 +27,7 @@ POSE_DROP_OFF = np.array([-1.6814, -0.6843, -1.4092, 0.8270, 0.0], dtype=np.floa
 BASELINE_POSES: Dict[str, np.ndarray] = {
     "HOME": POSE_HOME,
     "SCAN": POSE_SCAN,
-    "SEARCH_SCAN_INIT": POSE_SCAN,
     "DROP_OFF": POSE_DROP_OFF,
-    "DROP_OFF_BIN": POSE_DROP_OFF,
 }
 
 
