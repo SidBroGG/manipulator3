@@ -27,17 +27,18 @@ Computing is split between:
 ---
 
 ## Stage 2: Simulation Environment & Virtual Sensor Feeds
-- [ ] **2.1 MuJoCo Tabletop Scene Setup**
-  - [ ] 2.1.1 Create simulation environment with a flat table, ambient lighting, and base mounting coordinates.
-  - [ ] 2.1.2 Populate table with test objects (primitive shapes, textured blocks, colored cylinders/cubes).
-  - [ ] 2.1.3 Add a top/side overview camera for third-person visualization and debugging.
-- [ ] **2.2 Virtual Camera & ToF Data Acquisition**
-  - [ ] 2.2.1 Implement offscreen renderer pipeline to retrieve RGB frames from the gripper-mounted OV5647 camera.
-  - [ ] 2.2.2 Implement raycast reading from the virtual VL53L0X rangefinder sensor.
-  - [ ] 2.2.3 Build interactive OpenCV debug preview displaying gripper camera feed and current ToF distance overlay.
-- [ ] **2.3 Stage 2 Unit Tests**
-  - [ ] 2.3.1 Test camera render output format (RGB/BGR, resolution, FPS).
-  - [ ] 2.3.2 Test ToF range accuracy against known object distances on table.
+- [x] **2.1 MuJoCo Tabletop Scene Setup**
+  - [x] 2.1.1 Create simulation environment with a flat table, ambient lighting, and base mounting coordinates.
+  - [x] 2.1.2 Populate table with test objects (primitive shapes, textured blocks, colored cylinders/cubes).
+  - [x] 2.1.3 Add a top/side overview camera for third-person visualization and debugging.
+- [x] **2.2 Virtual Camera & ToF Data Acquisition**
+  - [x] 2.2.1 Implement offscreen renderer pipeline to retrieve RGB frames from the gripper-mounted OV5647 camera.
+  - [x] 2.2.2 Implement raycast reading from the virtual VL53L0X rangefinder sensor.
+  - [x] 2.2.3 Build interactive OpenCV debug preview displaying gripper camera feed and current ToF distance overlay.
+- [x] **2.3 Stage 2 Unit Tests**
+  - [x] 2.3.1 Test camera render output format (RGB/BGR, resolution, FPS).
+  - [x] 2.3.2 Test ToF range accuracy against known object distances on table.
+
 
 ---
 

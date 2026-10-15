@@ -1,0 +1,75 @@
+<mujoco model="manipulator_tabletop">
+  <compiler angle="radian" meshdir="meshes" autolimits="true"/>
+
+  <option gravity="0 0 -9.81" timestep="0.002"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.6 0.6 0.6" specular="0.2 0.2 0.2"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global fovy="45"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0.1 0.15 0.2" width="512" height="512"/>
+    <texture name="grid_tex" type="2d" builtin="checker" rgb1="0.85 0.85 0.85" rgb2="0.75 0.75 0.75" width="512" height="512"/>
+    <material name="floor_mat" texture="grid_tex" texrepeat="5 5" reflectance="0.1"/>
+    <material name="table_mat" rgba="0.25 0.27 0.32 1.0" reflectance="0.1" shininess="0.2"/>
+    <material name="bin_mat" rgba="0.2 0.6 0.8 0.6" reflectance="0.1"/>
+  </asset>
+
+  <worldbody>
+    <!-- Floor plane -->
+    <geom name="floor" type="plane" pos="0 0 -0.4" size="1.5 1.5 0.05" material="floor_mat"/>
+
+    <!-- Scene Lighting -->
+    <light directional="true" pos="0.5 -0.5 1.2" dir="-0.5 0.5 -1.0" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3"/>
+    <light directional="false" pos="0 0 1.0" diffuse="0.4 0.4 0.4"/>
+
+    <!-- Tabletop at Z=0 (40cm above floor) -->
+    <body name="table" pos="0.20 0 -0.02">
+      <geom name="table_top" type="box" size="0.40 0.35 0.02" material="table_mat" contype="1" conaffinity="1" friction="1.0 0.05 0.001"/>
+      <geom name="leg1" type="cylinder" pos="0.35 0.3 -0.19" size="0.015 0.19" rgba="0.15 0.15 0.15 1"/>
+      <geom name="leg2" type="cylinder" pos="-0.35 0.3 -0.19" size="0.015 0.19" rgba="0.15 0.15 0.15 1"/>
+      <geom name="leg3" type="cylinder" pos="0.35 -0.3 -0.19" size="0.015 0.19" rgba="0.15 0.15 0.15 1"/>
+      <geom name="leg4" type="cylinder" pos="-0.35 -0.3 -0.19" size="0.015 0.19" rgba="0.15 0.15 0.15 1"/>
+    </body>
+
+    <!-- Drop-off Zone bin near base (X=-0.02, Y=0.18, Z=0.001) -->
+    <body name="dropoff_zone" pos="-0.02 0.18 0.001">
+      <geom name="dropoff_pad" type="box" size="0.05 0.05 0.001" material="bin_mat" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Cameras -->
+    <!-- Overview Camera: Third-person angled view -->
+    <camera name="overview_camera" pos="0.55 -0.45 0.45" xyaxes="0.7071 0.7071 0 -0.4082 0.4082 0.8165"/>
+    <!-- Top Camera: Overhead view looking straight down at the table surface -->
+    <camera name="top_camera" pos="0.18 0.0 0.65" xyaxes="0 1 0 -1 0 0"/>
+
+    <!-- Test Objects on Table Surface (Z >= 0) -->
+    <!-- Red Cube -->
+    <body name="target_cube" pos="0.18 0.0 0.015">
+      <freejoint name="cube_joint"/>
+      <geom name="cube_geom" type="box" size="0.015 0.015 0.015" rgba="0.9 0.15 0.15 1.0" mass="0.03" friction="1.2 0.05 0.001"/>
+    </body>
+
+    <!-- Green Cylinder -->
+    <body name="target_cylinder" pos="0.16 0.12 0.02">
+      <freejoint name="cyl_joint"/>
+      <geom name="cyl_geom" type="cylinder" size="0.015 0.02" rgba="0.15 0.85 0.25 1.0" mass="0.03" friction="1.2 0.05 0.001"/>
+    </body>
+
+    <!-- Blue Box -->
+    <body name="target_box" pos="0.15 -0.12 0.018">
+      <freejoint name="box_joint"/>
+      <geom name="box_geom" type="box" size="0.018 0.012 0.018" rgba="0.15 0.35 0.9 1.0" mass="0.03" friction="1.2 0.05 0.001"/>
+    </body>
+
+    <!-- Yellow Target -->
+    <body name="target_yellow" pos="0.22 -0.04 0.015">
+      <freejoint name="yellow_joint"/>
+      <geom name="yellow_geom" type="cylinder" size="0.012 0.015" rgba="0.95 0.85 0.1 1.0" mass="0.025" friction="1.2 0.05 0.001"/>
+    </body>
+  </worldbody>
+
+  <include file="manipulator.xml"/>
+</mujoco>

@@ -7,6 +7,7 @@ import ikpy.chain
 # Repository paths
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MJCF_PATH = REPO_ROOT / "assets" / "manipulator.xml"
+SCENE_PATH = REPO_ROOT / "assets" / "scene.xml"
 URDF_PATH = REPO_ROOT / "assets" / "root.urdf"
 
 ARM_JOINTS = [
@@ -41,6 +42,13 @@ def load_mujoco_model(xml_path: Path | str | None = None) -> Tuple[mujoco.MjMode
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
     return model, data
+
+
+def load_mujoco_scene(xml_path: Path | str | None = None) -> Tuple[mujoco.MjModel, mujoco.MjData]:
+    """Load MuJoCo tabletop scene and initialize simulation data."""
+    path = str(xml_path or SCENE_PATH)
+    return load_mujoco_model(path)
+
 
 
 def load_ikpy_chain(urdf_path: Path | str | None = None) -> ikpy.chain.Chain:
