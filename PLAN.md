@@ -43,21 +43,21 @@ Computing is split between:
 ---
 
 ## Stage 3: Zenoh Communication Layer (Digital Twin & Hardware Agnostic)
-- [ ] **3.1 Unified Communication Specification**
-  - [ ] 3.1.1 Define Zenoh topic naming convention:
+- [x] **3.1 Unified Communication Specification**
+  - [x] 3.1.1 Define Zenoh topic naming convention:
     - `manipulator/camera/raw`: compressed JPEG image bytes.
     - `manipulator/tof/range`: float range in mm + status.
     - `manipulator/joints/command`: target angles (rad) for joints 1-6 + gripper.
     - `manipulator/joints/state`: actual joint positions, velocities.
     - `manipulator/status`: heartbeat and arm operational state.
-- [ ] **3.2 Laptop Zenoh Node**
-  - [ ] 3.2.1 Implement lightweight Zenoh session manager with zero-copy or compact serialization.
-  - [ ] 3.2.2 Implement subscriber handlers for camera feed and ToF data with ring buffers.
-  - [ ] 3.2.3 Implement publisher for joint position commands.
-- [ ] **3.3 Simulation Zenoh Bridge**
-  - [ ] 3.3.1 Connect MuJoCo simulation to Zenoh so that the simulation can be driven as a drop-in replacement for the real RPi Zero 2 W hardware.
-- [ ] **3.4 Stage 3 Unit Tests**
-  - [ ] 3.4.1 Test roundtrip latency and throughput of image frames and sensor packets over Zenoh.
+- [x] **3.2 Laptop Zenoh Node**
+  - [x] 3.2.1 Implement lightweight Zenoh session manager with zero-copy or compact serialization.
+  - [x] 3.2.2 Implement subscriber handlers for camera feed and ToF data with ring buffers.
+  - [x] 3.2.3 Implement publisher for joint position commands.
+- [x] **3.3 Simulation Zenoh Bridge**
+  - [x] 3.3.1 Connect MuJoCo simulation to Zenoh so that the simulation can be driven as a drop-in replacement for the real RPi Zero 2 W hardware.
+- [x] **3.4 Stage 3 Unit Tests**
+  - [x] 3.4.1 Test roundtrip latency and throughput of image frames and sensor packets over Zenoh.
 
 ---
 

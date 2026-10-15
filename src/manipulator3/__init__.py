@@ -8,9 +8,34 @@ from manipulator3.model import (
     get_gripper_pose,
     get_tof_reading,
 )
-from manipulator3.simulation import SimulationEnvironment, draw_sensor_overlay
+from manipulator3.protocol import (
+    TOPIC_CAMERA_RAW,
+    TOPIC_TOF_RANGE,
+    TOPIC_JOINTS_COMMAND,
+    TOPIC_JOINTS_STATE,
+    TOPIC_STATUS,
+    ToFRange,
+    JointsCommand,
+    JointsState,
+    RobotStatus,
+    encode_jpeg,
+    decode_jpeg,
+)
+
+
+def __getattr__(name: str):
+    if name in ("SimulationEnvironment", "draw_sensor_overlay"):
+        from manipulator3 import simulation
+        return getattr(simulation, name)
+    if name == "SimZenohBridge":
+        from manipulator3 import sim_bridge
+        return getattr(sim_bridge, name)
+    if name == "HostClient":
+        from manipulator3 import zenoh_client
+        return getattr(zenoh_client, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def main() -> None:
-    from manipulator3.sim_preview import main as preview_main
+    from manipulator3.zenoh_preview import main as preview_main
     preview_main()
