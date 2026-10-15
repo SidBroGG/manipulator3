@@ -96,9 +96,20 @@ def test_tof_rangefinder_accuracy_and_approach():
 
 
 def test_physics_simulation_stability():
-    """Verify objects rest stably on table surface without exploding or penetrating."""
+    """Verify objects and arm base rest stably on table surface without exploding or penetrating."""
     with SimulationEnvironment() as sim:
         sim.step(300)
+
+        # Verify manipulator base sits flush on table surface (Z >= 0)
+        base_bid = mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_BODY, "base_link")
+        base_gids = [i for i in range(sim.model.ngeom) if sim.model.geom_bodyid[i] == base_bid]
+        mid = sim.model.geom_dataid[base_gids[0]]
+        vadr = sim.model.mesh_vertadr[mid]
+        vnum = sim.model.mesh_vertnum[mid]
+        verts = sim.model.mesh_vert[vadr:vadr + vnum * 3].reshape(-1, 3)
+        base_min_z = sim.data.xpos[base_bid][2] + verts[:, 2].min()
+        assert np.isclose(base_min_z, 0.0, atol=1e-3), f"Base not flush with table: z={base_min_z}"
+
 
         for obj in ["target_cube", "target_cylinder", "target_box", "target_yellow"]:
             bid = mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_BODY, obj)
@@ -108,3 +119,4 @@ def test_physics_simulation_stability():
             assert z_pos < 0.10, f"Object '{obj}' flew away: z = {z_pos}"
             vel = np.linalg.norm(sim.data.cvel[bid])
             assert vel < 0.1, f"Object '{obj}' not resting stably: velocity = {vel}"
+
