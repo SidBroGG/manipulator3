@@ -62,17 +62,17 @@ Computing is split between:
 ---
 
 ## Stage 4: Kinematics Engine & Trajectory Planner
-- [ ] **4.1 Kinematics Setup (IKPy & MuJoCo IK)**
-  - [ ] 4.1.1 Initialize IKPy kinematic chain from URDF with exact link lengths, joint limits, and active joint masks.
-  - [ ] 4.1.2 Implement inverse kinematics (IK) solver calculating joint angles for desired 3D end-effector position `(x, y, z)` and pitch/yaw orientation.
-  - [ ] 4.1.3 Implement fallback/refinement using MuJoCo Jacobian-based IK for singularity avoidance.
-- [ ] **4.2 Trajectory Generation & Safety Constraints**
-  - [ ] 4.2.1 Implement minimum-jerk / cubic polynomial joint trajectory interpolation between waypoints.
-  - [ ] 4.2.2 Enforce software safety limits (table collision boundary, maximum servo velocities).
-  - [ ] 4.2.3 Define key baseline poses: `HOME`, `SEARCH_SCAN_INIT`, `DROP_OFF_BIN`.
-- [ ] **4.3 Stage 4 Unit Tests**
-  - [ ] 4.3.1 Test IK precision on reachable grid points on the table surface.
-  - [ ] 4.3.2 Test collision avoidance boundary enforcement.
+- [x] **4.1 Kinematics Setup (IKPy & MuJoCo IK)**
+  - [x] 4.1.1 Initialize IKPy kinematic chain from URDF with exact link lengths, joint limits, and active joint masks.
+  - [x] 4.1.2 Implement inverse kinematics (IK) solver calculating joint angles for desired 3D end-effector position `(x, y, z)` and pitch/yaw orientation.
+  - [x] 4.1.3 Implement fallback/refinement using MuJoCo Jacobian-based IK for singularity avoidance.
+- [x] **4.2 Trajectory Generation & Safety Constraints**
+  - [x] 4.2.1 Implement minimum-jerk / cubic polynomial joint trajectory interpolation between waypoints.
+  - [x] 4.2.2 Enforce software safety limits (table collision boundary, maximum servo velocities).
+  - [x] 4.2.3 Define key baseline poses: `HOME`, `SEARCH_SCAN_INIT`, `DROP_OFF_BIN`.
+- [x] **4.3 Stage 4 Unit Tests**
+  - [x] 4.3.1 Test IK precision on reachable grid points on the table surface.
+  - [x] 4.3.2 Test collision avoidance boundary enforcement.
 
 ---
 

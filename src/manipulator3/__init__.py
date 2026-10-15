@@ -33,6 +33,23 @@ def __getattr__(name: str):
     if name == "HostClient":
         from manipulator3 import zenoh_client
         return getattr(zenoh_client, name)
+    if name in (
+        "KinematicsEngine",
+        "SafetyLimitError",
+        "TableCollisionError",
+        "WorkspaceLimitError",
+        "KinematicsConvergenceError",
+        "POSE_HOME",
+        "POSE_SCAN",
+        "POSE_DROP_OFF",
+        "BASELINE_POSES",
+        "TABLE_Z_MIN",
+    ):
+        from manipulator3 import kinematics
+        return getattr(kinematics, name)
+    if name in ("TrajectoryPlanner", "Trajectory"):
+        from manipulator3 import trajectory
+        return getattr(trajectory, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
