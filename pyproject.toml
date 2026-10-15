@@ -1,0 +1,27 @@
+[project]
+name = "manipulator3"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "asus_windows", email = "sasha.sidenko09@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "eclipse-zenoh>=1.10.1",
+    "ikpy>=4.1.0",
+    "mediapipe>=1.1.1",
+    "mujoco>=3.16.0",
+    "numpy>=2.5.4",
+    "opencv-python>=5.0.0.93",
+    "pytest>=9.1.1",
+    "scipy>=1.18.1",
+    "ultralytics>=8.4.177",
+]
+
+[project.scripts]
+manipulator3 = "manipulator3:main"
+
+[build-system]
+requires = ["uv_build>=0.12.20,<0.13.0"]
+build-backend = "uv_build"
