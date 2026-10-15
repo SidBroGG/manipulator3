@@ -77,16 +77,16 @@ Computing is split between:
 ---
 
 ## Stage 5: Perception - Hand Pointing Ray & Target Estimation
-- [ ] **5.1 MediaPipe Hand Tracking**
-  - [ ] 5.1.1 Initialize MediaPipe Hands pipeline for detecting hand landmarks from external camera or simulated user view.
-  - [ ] 5.1.2 Extract 3D landmarks for index finger MCP (knuckle), PIP, and TIP.
-- [ ] **5.2 Pointing Ray Geometry & Table Intersection**
-  - [ ] 5.2.1 Compute pointing direction vector: $\vec{v} = \text{TIP} - \text{MCP}$.
-  - [ ] 5.2.2 Project 3D ray onto the 2D table plane $(Z = 0)$ to determine intersection coordinate $(X_{target}, Y_{target})$.
-  - [ ] 5.2.3 Define search sector / confidence radius around the intersection point to guide manipulator orientation.
-- [ ] **5.3 Stage 5 Unit Tests**
-  - [ ] 5.3.1 Test ray-plane intersection math with simulated finger vectors.
-  - [ ] 5.3.2 Verify handling of parallel rays (pointing horizon) and out-of-bounds projections.
+- [x] **5.1 MediaPipe Hand Tracking**
+  - [x] 5.1.1 Initialize MediaPipe Hands pipeline for detecting hand landmarks from external camera or simulated user view.
+  - [x] 5.1.2 Extract 3D landmarks for index finger MCP (knuckle), PIP, and TIP.
+- [x] **5.2 Pointing Ray Geometry & Table Intersection**
+  - [x] 5.2.1 Compute pointing direction vector: $\vec{v} = \text{TIP} - \text{MCP}$.
+  - [x] 5.2.2 Project 3D ray onto the 2D table plane $(Z = 0)$ to determine intersection coordinate $(X_{target}, Y_{target})$.
+  - [x] 5.2.3 Define search sector / confidence radius around the intersection point to guide manipulator orientation.
+- [x] **5.3 Stage 5 Unit Tests**
+  - [x] 5.3.1 Test ray-plane intersection math with simulated finger vectors.
+  - [x] 5.3.2 Verify handling of parallel rays (pointing horizon) and out-of-bounds projections.
 
 ---
 

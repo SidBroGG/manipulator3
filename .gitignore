@@ -44,6 +44,8 @@ htmlcov/
 runs/
 *.pt
 *.onnx
+*.task
+assets/models/
 yolo11n.pt
 # Logs & temp files
 *.log
