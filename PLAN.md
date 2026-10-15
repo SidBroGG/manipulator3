@@ -10,19 +10,19 @@ Computing is split between:
 ---
 
 ## Stage 1: URDF Adaptation, Mesh Sanitization & MuJoCo Model
-- [ ] **1.1 URDF Verification & Cleanup**
-  - [ ] 1.1.1 Inspect `urdf_model/root/urdf/root.urdf` joint definitions, limits, and axis orientations.
-  - [ ] 1.1.2 Normalize STL mesh filenames and paths (replace Cyrillic/space characters with standard ASCII naming to ensure multi-platform loader compatibility in MuJoCo and IKPy).
-  - [ ] 1.1.3 Verify kinematic chain continuity from `base__подставка` to end-effector `main__gripperbase` and jaws `main__gripper1`, `main__gripper2`.
-- [ ] **1.2 MuJoCo Model Definition (MJCF)**
-  - [ ] 1.2.1 Convert/load URDF into MuJoCo MJCF format (`assets/manipulator.xml`).
-  - [ ] 1.2.2 Add visual and collision geoms for links and gripper fingers with realistic friction parameters.
-  - [ ] 1.2.3 Define actuators for joints: `revolute_1` (base yaw), `revolute_2` (shoulder pitch), `revolute_3` (elbow pitch), `revolute_4` (wrist pitch), `revolute_5` (wrist roll), and gripper actuator (`revolute_7` with mimic coupling to `revolute_6`).
-- [ ] **1.3 Sensor Rig Modeling in MuJoCo**
-  - [ ] 1.3.1 Mount a virtual camera on `main__gripperbase` aligned with the gripper squeeze direction, matching the OV5647 FOV (~62° horizontal).
-  - [ ] 1.3.2 Mount a virtual rangefinder sensor (ToF) on `main__gripperbase` parallel to the gripper axis, matching VL53L0X specs (up to 2m, cone ~25°).
-- [ ] **1.4 Stage 1 Unit Tests**
-  - [ ] 1.4.1 Test model compilation and forward kinematics validation in MuJoCo.
+- [x] **1.1 URDF Verification & Cleanup**
+  - [x] 1.1.1 Inspect `urdf_model/root/urdf/root.urdf` joint definitions, limits, and axis orientations.
+  - [x] 1.1.2 Normalize STL mesh filenames and paths (replace Cyrillic/space characters with standard ASCII naming to ensure multi-platform loader compatibility in MuJoCo and IKPy).
+  - [x] 1.1.3 Verify kinematic chain continuity from `base__подставка` (`base_link`) to end-effector `main__gripperbase` and jaws `main__gripper1`, `main__gripper2`.
+- [x] **1.2 MuJoCo Model Definition (MJCF)**
+  - [x] 1.2.1 Convert/load URDF into MuJoCo MJCF format (`assets/manipulator.xml`).
+  - [x] 1.2.2 Add visual and collision geoms for links and gripper fingers with realistic friction parameters.
+  - [x] 1.2.3 Define actuators for joints: `revolute_1` (base yaw), `revolute_2` (shoulder pitch), `revolute_3` (elbow pitch), `revolute_4` (wrist pitch), `revolute_5` (wrist roll), and gripper actuator (`revolute_7` with mimic coupling to `revolute_6`).
+- [x] **1.3 Sensor Rig Modeling in MuJoCo**
+  - [x] 1.3.1 Mount a virtual camera on `main__gripperbase` aligned with the gripper squeeze direction, matching the OV5647 FOV (~62° horizontal).
+  - [x] 1.3.2 Mount a virtual rangefinder sensor (ToF) on `main__gripperbase` parallel to the gripper axis, matching VL53L0X specs (up to 2m, cone ~25°).
+- [x] **1.4 Stage 1 Unit Tests**
+  - [x] 1.4.1 Test model compilation and forward kinematics validation in MuJoCo.
 
 ---
 

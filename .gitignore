@@ -45,9 +45,8 @@ runs/
 *.pt
 *.onnx
 yolo11n.pt
-assets/
-
 # Logs & temp files
 *.log
+MUJOCO_LOG.TXT
 temp/
 tmp/
