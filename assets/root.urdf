@@ -18,14 +18,14 @@
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/base_stand.stl" scale="1 1 1"/>
+                <mesh filename="meshes/base_stand.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/base_stand.stl" scale="1 1 1"/>
+                <mesh filename="meshes/base_stand.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>
@@ -39,14 +39,14 @@
         <visual>
             <origin xyz="-3.236e-48 6.8544e-17 -0.014" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/base_spinning.stl" scale="1 1 1"/>
+                <mesh filename="meshes/base_spinning.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="-3.236e-48 6.8544e-17 -0.014" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/base_spinning.stl" scale="1 1 1"/>
+                <mesh filename="meshes/base_spinning.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>
@@ -60,14 +60,14 @@
         <visual>
             <origin xyz="0.0002 -0.010669 -0.057969" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/shoulder.stl" scale="1 1 1"/>
+                <mesh filename="meshes/shoulder.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="0.0002 -0.010669 -0.057969" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/shoulder.stl" scale="1 1 1"/>
+                <mesh filename="meshes/shoulder.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>
@@ -81,14 +81,14 @@
         <visual>
             <origin xyz="0.0002 -0.010669 -0.174969" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/elbow.stl" scale="1 1 1"/>
+                <mesh filename="meshes/elbow.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="0.0002 -0.010669 -0.174969" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/elbow.stl" scale="1 1 1"/>
+                <mesh filename="meshes/elbow.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>
@@ -102,14 +102,14 @@
         <visual>
             <origin xyz="-0.000223271 0.0100928 -0.289483" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/wrist.stl" scale="1 1 1"/>
+                <mesh filename="meshes/wrist.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="-0.000223271 0.0100928 -0.289483" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/wrist.stl" scale="1 1 1"/>
+                <mesh filename="meshes/wrist.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>
@@ -123,14 +123,14 @@
         <visual>
             <origin xyz="0.013 0 -0.3665" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/gripper_base.stl" scale="1 1 1"/>
+                <mesh filename="meshes/gripper_base.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="0.013 0 -0.3665" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/gripper_base.stl" scale="1 1 1"/>
+                <mesh filename="meshes/gripper_base.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>
@@ -144,14 +144,14 @@
         <visual>
             <origin xyz="0.0171294 -0.00955012 -0.402" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/gripper_finger1.stl" scale="1 1 1"/>
+                <mesh filename="meshes/gripper_finger1.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="0.0171294 -0.00955012 -0.402" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/gripper_finger1.stl" scale="1 1 1"/>
+                <mesh filename="meshes/gripper_finger1.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>
@@ -165,14 +165,14 @@
         <visual>
             <origin xyz="0.0170823 0.00745048 -0.402" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/gripper_finger2.stl" scale="1 1 1"/>
+                <mesh filename="meshes/gripper_finger2.stl" scale="1 1 1"/>
             </geometry>
             <material name="petg_grey"/>
         </visual>
         <collision>
             <origin xyz="0.0170823 0.00745048 -0.402" rpy="0 0 0"/>
             <geometry>
-                <mesh filename="../meshes/gripper_finger2.stl" scale="1 1 1"/>
+                <mesh filename="meshes/gripper_finger2.stl" scale="1 1 1"/>
             </geometry>
         </collision>
     </link>

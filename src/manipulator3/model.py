@@ -7,7 +7,7 @@ import ikpy.chain
 # Repository paths
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MJCF_PATH = REPO_ROOT / "assets" / "manipulator.xml"
-URDF_PATH = REPO_ROOT / "urdf_model" / "root" / "urdf" / "root.urdf"
+URDF_PATH = REPO_ROOT / "assets" / "root.urdf"
 
 ARM_JOINTS = [
     "revolute_1",  # base yaw

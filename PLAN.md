@@ -11,7 +11,7 @@ Computing is split between:
 
 ## Stage 1: URDF Adaptation, Mesh Sanitization & MuJoCo Model
 - [x] **1.1 URDF Verification & Cleanup**
-  - [x] 1.1.1 Inspect `urdf_model/root/urdf/root.urdf` joint definitions, limits, and axis orientations.
+  - [x] 1.1.1 Inspect `assets/root.urdf` joint definitions, limits, and axis orientations.
   - [x] 1.1.2 Normalize STL mesh filenames and paths (replace Cyrillic/space characters with standard ASCII naming to ensure multi-platform loader compatibility in MuJoCo and IKPy).
   - [x] 1.1.3 Verify kinematic chain continuity from `base__подставка` (`base_link`) to end-effector `main__gripperbase` and jaws `main__gripper1`, `main__gripper2`.
 - [x] **1.2 MuJoCo Model Definition (MJCF)**
