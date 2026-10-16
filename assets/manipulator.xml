@@ -12,7 +12,7 @@
       <geom group="0" type="mesh" contype="1" conaffinity="1" density="1050" rgba="0.8 0.2 0.2 0.0" friction="1.0 0.05 0.001"/>
     </default>
     <default class="gripper_finger">
-      <geom group="0" type="mesh" contype="1" conaffinity="1" density="1050" rgba="0.65 0.65 0.65 1.0" friction="1.5 0.05 0.001"/>
+      <geom group="0" type="mesh" contype="1" conaffinity="1" condim="4" density="1050" rgba="0.65 0.65 0.65 1.0" friction="2.5 0.1 0.001" solref="0.015 1" solimp="0.95 0.99 0.001 0.5 2"/>
     </default>
   </default>
 
@@ -66,13 +66,13 @@
 
                 <!-- Gripper jaw 2 (mimicked) -->
                 <body name="main__gripper2" pos="-0.0042323 -0.00744957 0.0355">
-                  <joint name="revolute_6" type="hinge" axis="-1 0 0" range="-0.6 0.15"/>
+                  <joint name="revolute_6" type="hinge" axis="-1 0 0" range="-0.6 0.6"/>
                   <geom class="gripper_finger" mesh="gripper_finger2" pos="0.0170823 0.00745048 -0.402"/>
                 </body>
 
                 <!-- Gripper jaw 1 (actuated) -->
                 <body name="main__gripper1" pos="-0.0041294 0.00955012 0.0355">
-                  <joint name="revolute_7" type="hinge" axis="-1 0 0" range="-0.15 0.6"/>
+                  <joint name="revolute_7" type="hinge" axis="-1 0 0" range="-0.6 0.6"/>
                   <geom class="gripper_finger" mesh="gripper_finger1" pos="0.0171294 -0.00955012 -0.402"/>
                 </body>
               </body>
@@ -93,7 +93,7 @@
     <position name="act_revolute_3" joint="revolute_3" kp="25" kv="1.5" ctrlrange="-1.5708 1.5708"/>
     <position name="act_revolute_4" joint="revolute_4" kp="15" kv="1" ctrlrange="-1.5708 1.5708"/>
     <position name="act_revolute_5" joint="revolute_5" kp="10" kv="0.5" ctrlrange="-1.5708 1.5708"/>
-    <position name="act_gripper" joint="revolute_7" kp="15" kv="1" ctrlrange="-0.15 0.6"/>
+    <position name="act_gripper" joint="revolute_7" kp="30" kv="1.5" ctrlrange="-0.6 0.6"/>
   </actuator>
 
   <sensor>
@@ -102,5 +102,6 @@
 
   <contact>
     <exclude body1="base_link" body2="base_spinning"/>
+    <exclude body1="main__gripper1" body2="main__gripper2"/>
   </contact>
 </mujoco>

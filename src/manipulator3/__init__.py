@@ -83,6 +83,26 @@ def __getattr__(name: str):
     ):
         from manipulator3 import servoing
         return getattr(servoing, name)
+    if name in (
+        "ApproachStatus",
+        "ToFApproachController",
+        "GraspController",
+        "GRIPPER_OPEN",
+        "GRIPPER_GRASP_CMD",
+        "GRIPPER_CLOSED_EMPTY",
+        "TOF_TARGET_MIN_MM",
+        "TOF_TARGET_MAX_MM",
+        "TOF_TARGET_NOMINAL_MM",
+    ):
+        from manipulator3 import grasping
+        return getattr(grasping, name)
+    if name in (
+        "ManipulatorState",
+        "StateMachineOutput",
+        "PickAndPlaceStateMachine",
+    ):
+        from manipulator3 import state_machine
+        return getattr(state_machine, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -94,4 +114,5 @@ def main() -> None:
     print("  uv run python examples/kinematics_preview.py")
     print("  uv run python examples/hand_preview.py")
     print("  uv run python examples/detector_preview.py")
+    print("  uv run python examples/statemachine_preview.py")
 

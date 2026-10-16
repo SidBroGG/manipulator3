@@ -106,19 +106,19 @@ Computing is split between:
 ---
 
 ## Stage 7: Grasping Strategy & ToF-Assisted Pick-and-Place State Machine
-- [ ] **7.1 Fine Approach Using ToF Rangefinder**
-  - [ ] 7.1.1 Once object is centered visually, drive end-effector downward along the line of sight.
-  - [ ] 7.1.2 Continuously poll VL53L0X distance reading until target distance threshold is reached (e.g., 25–40 mm inside gripper jaws).
-  - [ ] 7.1.3 Stop approach and verify gripper clearance before closing.
-- [ ] **7.2 Grasping & Transport Sequence**
-  - [ ] 7.2.1 Close gripper (`revolute_7` -> closed threshold) and verify contact/grip.
-  - [ ] 7.2.2 Lift end-effector vertically by 80 mm (pre-transfer lift).
-  - [ ] 7.2.3 Trajectory move to drop-off location on the table adjacent to the manipulator base.
-  - [ ] 7.2.4 Lower end-effector, open gripper to release object, retract to `HOME`.
-- [ ] **7.3 Core State Machine Execution**
-  - [ ] 7.3.1 Build finite state machine: `IDLE` -> `POINTING_DETECTED` -> `SECTOR_SCAN` -> `VISUAL_ALIGN` -> `TOF_APPROACH` -> `GRASP` -> `TRANSPORT` -> `RELEASE` -> `HOME`.
-- [ ] **7.4 Stage 7 Unit Tests**
-  - [ ] 7.4.1 Test full autonomous pick-and-place loop in MuJoCo simulation from pointing input to release.
+- [x] **7.1 Fine Approach Using ToF Rangefinder**
+  - [x] 7.1.1 Once object is centered visually, drive end-effector downward along the line of sight.
+  - [x] 7.1.2 Continuously poll VL53L0X distance reading until target distance threshold is reached (e.g., 25–40 mm inside gripper jaws).
+  - [x] 7.1.3 Stop approach and verify gripper clearance before closing.
+- [x] **7.2 Grasping & Transport Sequence**
+  - [x] 7.2.1 Close gripper (`revolute_7` -> closed threshold) and verify contact/grip.
+  - [x] 7.2.2 Lift end-effector vertically by 80 mm (pre-transfer lift).
+  - [x] 7.2.3 Trajectory move to drop-off location on the table adjacent to the manipulator base.
+  - [x] 7.2.4 Lower end-effector, open gripper to release object, retract to `HOME`.
+- [x] **7.3 Core State Machine Execution**
+  - [x] 7.3.1 Build finite state machine: `IDLE` -> `POINTING_DETECTED` -> `SECTOR_SCAN` -> `VISUAL_ALIGN` -> `TOF_APPROACH` -> `GRASP` -> `TRANSPORT` -> `RELEASE` -> `HOME`.
+- [x] **7.4 Stage 7 Unit Tests**
+  - [x] 7.4.1 Test full autonomous pick-and-place loop in MuJoCo simulation from pointing input to release.
 
 ---
 
