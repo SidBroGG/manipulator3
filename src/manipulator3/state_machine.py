@@ -271,6 +271,13 @@ class PickAndPlaceStateMachine:
                 self.state_step_count = 0
             elif status == ApproachStatus.APPROACHING:
                 self.commanded_q = next_q
+                self.lost_frames_count = 0
+            elif status == ApproachStatus.OUT_OF_RANGE:
+                self.lost_frames_count += 1
+                if self.lost_frames_count > 30:
+                    logger.warning("ToF signal lost during approach, returning to VISUAL_ALIGN")
+                    self.state = ManipulatorState.VISUAL_ALIGN
+                    self.lost_frames_count = 0
 
             return StateMachineOutput(
                 state=self.state,

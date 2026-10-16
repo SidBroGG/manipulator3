@@ -72,11 +72,11 @@
 
     <!-- Visual Hand & Pointing Target Marker (Mocap bodies for interactive tracking) -->
     <body name="human_hand" mocap="true" pos="0.30 0.0 0.25">
-      <geom name="hand_geom" type="sphere" size="0.018" rgba="1.0 0.5 0.1 0.85" contype="0" conaffinity="0"/>
+      <geom name="hand_geom" type="sphere" size="0.018" rgba="1.0 0.5 0.1 0.85" contype="0" conaffinity="0" group="2"/>
       <site name="hand_site" pos="0 0 0" size="0.005" rgba="1 1 1 0.9"/>
     </body>
     <body name="pointing_marker" mocap="true" pos="0.18 0.0 0.002">
-      <geom name="marker_geom" type="cylinder" size="0.025 0.002" rgba="1.0 0.2 0.2 0.65" contype="0" conaffinity="0"/>
+      <geom name="marker_geom" type="cylinder" size="0.025 0.002" rgba="1.0 0.2 0.2 0.65" contype="0" conaffinity="0" group="2"/>
       <site name="marker_site" pos="0 0 0" size="0.006" rgba="1 0 0 0.9"/>
     </body>
   </worldbody>

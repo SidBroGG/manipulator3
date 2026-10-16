@@ -73,6 +73,21 @@ def get_gripper_pose(model: mujoco.MjModel, data: mujoco.MjData) -> Tuple[np.nda
 
 def get_tof_reading(model: mujoco.MjModel, data: mujoco.MjData) -> float:
     """Return distance in meters from virtual VL53L0X ToF rangefinder (-1.0 if clear)."""
+    site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "tof_site")
+    if site_id >= 0:
+        p = data.site_xpos[site_id]
+        mat = data.site_xmat[site_id].reshape(3, 3)
+        vec = mat[:, 2]
+
+        # Intersect physical surfaces (groups 0 & 1), ignoring group 2 visual markers
+        geomgroup = np.array([1, 1, 0, 0, 0, 0], dtype=np.uint8)
+        body_id = model.site_bodyid[site_id]
+        geom_id = np.zeros(1, dtype=np.int32)
+        dist = mujoco.mj_ray(model, data, p, vec, geomgroup, 1, body_id, geom_id)
+        if dist < 0.0 or dist > 2.0:
+            return -1.0
+        return float(dist)
+
     sensor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, "tof_rangefinder")
     if sensor_id < 0:
         raise ValueError("Sensor 'tof_rangefinder' not found in model.")

@@ -162,13 +162,20 @@ class GraspController:
         """Plan vertical pre-transfer lift by lift_height_m."""
         ee_pos, _ = self.kinematics.forward_kinematics(current_q)
         lift_pos = ee_pos.copy()
-        lift_pos[2] += self.lift_height_m
+        lift_pos[2] = min(lift_pos[2] + self.lift_height_m, 0.28)
 
-        q_lift = self.kinematics.inverse_kinematics(
-            lift_pos,
-            initial_guess=current_q,
-            tolerance=3e-3,
-        )
+        try:
+            q_lift = self.kinematics.inverse_kinematics(
+                lift_pos,
+                initial_guess=current_q,
+                tolerance=6e-3,
+            )
+        except Exception as e:
+            logger.warning("Pre-transfer lift IK fallback (%s)", e)
+            q_lift = current_q.copy()
+            q_lift[1] = max(q_lift[1] - 0.20, -1.2)
+            q_lift[2] = min(q_lift[2] + 0.15, 1.2)
+
         return self.planner.generate_trajectory(
             current_q,
             q_lift,
