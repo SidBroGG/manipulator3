@@ -30,16 +30,15 @@ class TrackingState(str, Enum):
 
 
 class VisualServoController:
-    """Proportional visual servoing controller with anti-windup and error damping."""
+    """Proportional visual servoing controller with anti-windup and position holding."""
 
     def __init__(
         self,
-        k_yaw: float = 0.16,
-        k_pitch: float = 0.14,
-        max_step_rad: float = 0.018,
+        k_yaw: float = 0.14,
+        k_pitch: float = 0.12,
+        max_step_rad: float = 0.008,
         tolerance_norm: float = 0.035,
-        deadband_norm: float = 0.012,
-        smoothing_alpha: float = 0.4,
+        deadband_norm: float = 0.015,
         joint_limits: Optional[Dict[int, Tuple[float, float]]] = None,
     ) -> None:
         self.k_yaw = k_yaw
@@ -47,15 +46,11 @@ class VisualServoController:
         self.max_step_rad = max_step_rad
         self.tolerance_norm = tolerance_norm
         self.deadband_norm = deadband_norm
-        self.smoothing_alpha = smoothing_alpha
         self.joint_limits = joint_limits or DEFAULT_JOINT_LIMITS
-        self._filtered_eu: Optional[float] = None
-        self._filtered_ev: Optional[float] = None
 
     def reset(self) -> None:
-        """Reset internal filter states."""
-        self._filtered_eu = None
-        self._filtered_ev = None
+        """Reset internal controller state."""
+        pass
 
     def is_centered(self, target: DetectedObject) -> bool:
         """Check if target center is within normalized tolerance deadband."""
@@ -63,21 +58,8 @@ class VisualServoController:
         return abs(eu) <= self.tolerance_norm and abs(ev) <= self.tolerance_norm
 
     def compute_joint_deltas(self, target: DetectedObject) -> Tuple[float, float]:
-        """Compute (dq_yaw, dq_pitch) joint increments with smoothing and deadband."""
-        raw_eu, raw_ev = target.norm_center
-
-        if self._filtered_eu is None:
-            self._filtered_eu = raw_eu
-            self._filtered_ev = raw_ev
-        else:
-            self._filtered_eu = (
-                self.smoothing_alpha * raw_eu + (1.0 - self.smoothing_alpha) * self._filtered_eu
-            )
-            self._filtered_ev = (
-                self.smoothing_alpha * raw_ev + (1.0 - self.smoothing_alpha) * self._filtered_ev
-            )
-
-        eu, ev = self._filtered_eu, self._filtered_ev
+        """Compute (dq_yaw, dq_pitch) joint increments with deadband and rate limiting."""
+        eu, ev = target.norm_center
 
         dq_yaw = (
             float(np.clip(-self.k_yaw * eu, -self.max_step_rad, self.max_step_rad))
@@ -99,16 +81,24 @@ class VisualServoController:
     ) -> Tuple[np.ndarray, bool]:
         """
         Perform one visual servo control step with anti-windup.
-        Returns:
-            (new_q, is_aligned): updated joint angles and alignment boolean flag.
+        Updates only JOINT_YAW (0) and JOINT_PITCH (3) while preserving other joint setpoints.
         """
-        base_q = actual_q if actual_q is not None else current_q
-        new_q = np.asarray(base_q, dtype=np.float64).copy()
+        new_q = np.asarray(current_q, dtype=np.float64).copy()
 
         if self.is_centered(target):
             return new_q, True
 
         dq_yaw, dq_pitch = self.compute_joint_deltas(target)
+
+        # Anti-windup: do not accumulate setpoint if physical servo lags behind in the same direction
+        if actual_q is not None:
+            lag_yaw = current_q[JOINT_YAW] - actual_q[JOINT_YAW]
+            if abs(lag_yaw) > 0.02 and (dq_yaw * lag_yaw > 0):
+                dq_yaw = 0.0
+            lag_pitch = current_q[JOINT_PITCH] - actual_q[JOINT_PITCH]
+            if abs(lag_pitch) > 0.02 and (dq_pitch * lag_pitch > 0):
+                dq_pitch = 0.0
+
         new_q[JOINT_YAW] += dq_yaw
         new_q[JOINT_PITCH] += dq_pitch
 
@@ -218,6 +208,7 @@ class VisualSearchTracker:
         self.waypoint_idx: int = 0
         self.lost_counter: int = 0
         self.max_lost_frames: int = 5
+        self.locked_target_name: Optional[str] = None
 
     def start_search(
         self,
@@ -225,6 +216,7 @@ class VisualSearchTracker:
         pointing_target: Optional[PointingTarget] = None,
     ) -> np.ndarray:
         """Initialize search in specified pointing sector."""
+        self.locked_target_name = None
         if pointing_target is not None:
             az = pointing_target.sector_center_rad
             span = pointing_target.sector_span_rad
@@ -257,7 +249,22 @@ class VisualSearchTracker:
             (commanded_q, state, best_detection)
         """
         detections = self.detector.detect(frame)
-        best_target = self.detector.get_best_target(detections) if hasattr(self.detector, "get_best_target") else (detections[0] if detections else None)
+        best_target: Optional[DetectedObject] = None
+
+        if detections:
+            # If already tracking a target class, stick to it to prevent target-switching jitter
+            if self.locked_target_name is not None:
+                matching = [d for d in detections if d.class_name == self.locked_target_name]
+                if matching:
+                    best_target = min(matching, key=lambda d: d.norm_center[0] ** 2 + d.norm_center[1] ** 2)
+
+            if best_target is None:
+                if hasattr(self.detector, "get_best_target"):
+                    best_target = self.detector.get_best_target(detections, strategy="center")
+                else:
+                    best_target = min(detections, key=lambda d: d.norm_center[0] ** 2 + d.norm_center[1] ** 2)
+                if best_target is not None:
+                    self.locked_target_name = best_target.class_name
 
         if best_target is not None:
             # Target acquired -> switch to or maintain visual centering
@@ -276,6 +283,7 @@ class VisualSearchTracker:
                 return current_q.copy(), TrackingState.CENTERING, None
             # Lost target completely -> resume search sweep
             logger.info("Target lost, resuming sweep")
+            self.locked_target_name = None
             self.state = TrackingState.SWEEPING
 
         if self.state in (TrackingState.ORIENTING, TrackingState.SWEEPING):

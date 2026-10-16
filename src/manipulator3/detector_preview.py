@@ -47,7 +47,13 @@ def main() -> None:
 
     tracker = VisualSearchTracker(
         detector=active_detector,
-        servo_controller=VisualServoController(k_yaw=0.16, k_pitch=0.14, max_step_rad=0.018),
+        servo_controller=VisualServoController(
+            k_yaw=0.14,
+            k_pitch=0.12,
+            max_step_rad=0.008,
+            tolerance_norm=0.035,
+            deadband_norm=0.015,
+        ),
         scanner=SectorScanner(),
     )
 
@@ -108,6 +114,7 @@ def main() -> None:
                     active_detector = color_detector
                     active_mode = "COLOR"
                 tracker.detector = active_detector
+                tracker.locked_target_name = None
                 logger.info("Switched detector to %s", active_mode)
         elif key == ord("s"):
             azimuth_target = float(np.random.uniform(-0.35, 0.35))
@@ -122,6 +129,7 @@ def main() -> None:
             current_q = POSE_SCAN.copy()
             env.set_actuator_targets(current_q)
             tracker.state = TrackingState.IDLE
+            tracker.locked_target_name = None
             logger.info("Reset to POSE_SCAN")
 
     env.close()

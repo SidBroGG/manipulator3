@@ -327,6 +327,20 @@ class ColorBlobDetector:
         detections.sort(key=lambda d: d.area, reverse=True)
         return detections
 
+    def get_best_target(
+        self,
+        detections: List[DetectedObject],
+        strategy: str = "center",
+    ) -> Optional[DetectedObject]:
+        """Select best candidate target according to strategy ('center', 'area', 'confidence')."""
+        if not detections:
+            return None
+        if strategy == "center":
+            return min(detections, key=lambda d: d.norm_center[0] ** 2 + d.norm_center[1] ** 2)
+        if strategy == "area":
+            return max(detections, key=lambda d: d.area)
+        return detections[0]
+
 
 def draw_detection_overlay(
     frame: np.ndarray,
