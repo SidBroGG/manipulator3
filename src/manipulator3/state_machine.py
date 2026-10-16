@@ -58,7 +58,7 @@ class PickAndPlaceStateMachine:
         self.kinematics = kinematics_engine or KinematicsEngine()
         self.planner = trajectory_planner or TrajectoryPlanner(self.kinematics)
         self.detector = detector or ColorBlobDetector(target_colors=[target_name] if target_name else None)
-        self.servo = servo_controller or VisualServoController(k_yaw=0.35, k_pitch=0.30, tolerance_norm=0.03)
+        self.servo = servo_controller or VisualServoController(k_yaw=0.35, k_pitch=0.30, max_step_rad=0.035, tolerance_norm=0.055)
         self.scanner = scanner or SectorScanner()
         self.approach = approach_controller or ToFApproachController(self.kinematics)
         self.grasp = grasp_controller or GraspController(self.kinematics, self.planner)
@@ -249,8 +249,10 @@ class PickAndPlaceStateMachine:
             self.commanded_gripper = GRIPPER_OPEN
             self.state_step_count += 1
 
-            if self.approach.is_at_grasp_distance(tof_mm):
-                logger.info("Target ToF reach: %.1f mm. Transition -> GRASP", tof_mm)
+            ee_pos, _ = self.kinematics.forward_kinematics(current_q)
+
+            if self.approach.is_at_grasp_distance(tof_mm) or (ee_pos[2] <= 0.115 and self.state_step_count >= 3):
+                logger.info("Target reached (ToF: %.1f mm, EE Z: %.3f m). Transition -> GRASP", tof_mm, ee_pos[2])
                 self.state = ManipulatorState.GRASP
                 self.grasp_substate = "CLOSE"
                 self.commanded_gripper = GRIPPER_GRASP_CMD
@@ -273,11 +275,18 @@ class PickAndPlaceStateMachine:
                 self.commanded_q = next_q
                 self.lost_frames_count = 0
             elif status == ApproachStatus.OUT_OF_RANGE:
-                self.lost_frames_count += 1
-                if self.lost_frames_count > 30:
-                    logger.warning("ToF signal lost during approach, returning to VISUAL_ALIGN")
-                    self.state = ManipulatorState.VISUAL_ALIGN
-                    self.lost_frames_count = 0
+                if ee_pos[2] <= 0.130 and self.state_step_count >= 5:
+                    logger.info("Close to target at table Z=%.3fm, concluding approach -> GRASP", ee_pos[2])
+                    self.state = ManipulatorState.GRASP
+                    self.grasp_substate = "CLOSE"
+                    self.commanded_gripper = GRIPPER_GRASP_CMD
+                    self.state_step_count = 0
+                else:
+                    self.lost_frames_count += 1
+                    if self.lost_frames_count > 30:
+                        logger.warning("ToF signal lost during approach, returning to VISUAL_ALIGN")
+                        self.state = ManipulatorState.VISUAL_ALIGN
+                        self.lost_frames_count = 0
 
             return StateMachineOutput(
                 state=self.state,
@@ -290,7 +299,7 @@ class PickAndPlaceStateMachine:
             if self.grasp_substate == "CLOSE":
                 self.commanded_gripper = GRIPPER_GRASP_CMD
                 self.state_step_count += 1
-                if self.state_step_count >= 15:
+                if self.state_step_count >= 20:
                     is_gripped = self.grasp.verify_grip(gripper_joint_pos)
                     logger.info("Grip verification: %s (pos=%.4f rad)", is_gripped, gripper_joint_pos)
                     # Plan pre-transfer lift

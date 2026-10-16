@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 # Gripper actuator setpoints and limits (radians)
 GRIPPER_OPEN: float = 0.40
-GRIPPER_GRASP_CMD: float = -0.40
-GRIPPER_CLOSED_EMPTY: float = -0.55
+GRIPPER_GRASP_CMD: float = -0.52
+GRIPPER_CLOSED_EMPTY: float = -0.58
 
 # Contact detection thresholds for revolute_7
 GRIPPER_CONTACT_MIN_RAD: float = -0.48
@@ -189,13 +189,30 @@ class GraspController:
         target_pose: Optional[np.ndarray] = None,
         duration: float = 1.5,
     ) -> Trajectory:
-        """Plan smooth trajectory from current configuration to drop-off zone."""
+        """Plan smooth trajectory lifting through air with clearance arch to drop-off zone."""
         goal = target_pose if target_pose is not None else self.drop_off_pose
-        return self.planner.generate_trajectory(
-            current_q,
-            goal,
-            duration=duration,
-            validate=False,
+        q0 = np.asarray(current_q, dtype=np.float64)
+        q1 = np.asarray(goal, dtype=np.float64)
+
+        traj = self.planner.generate_trajectory(q0, q1, duration=duration, validate=False)
+        positions = traj.positions.copy()
+
+        # Add vertical clearance arch: smooth bell curve peaking in mid-transit
+        tau = traj.times / traj.duration
+        arch = np.sin(np.pi * tau) ** 2
+        positions[:, 1] += 0.40 * arch  # lift shoulder
+        positions[:, 2] += 0.25 * arch  # lift elbow
+
+        vels = np.gradient(positions, traj.dt, axis=0)
+        accs = np.gradient(vels, traj.dt, axis=0)
+
+        return Trajectory(
+            times=traj.times,
+            positions=positions,
+            velocities=vels,
+            accelerations=accs,
+            duration=traj.duration,
+            dt=traj.dt,
         )
 
     def plan_return_home(
@@ -203,10 +220,27 @@ class GraspController:
         current_q: np.ndarray,
         duration: float = 1.2,
     ) -> Trajectory:
-        """Plan smooth return trajectory to POSE_HOME."""
-        return self.planner.generate_trajectory(
-            current_q,
-            self.home_pose,
-            duration=duration,
-            validate=False,
+        """Plan smooth return trajectory to POSE_HOME through high clearance arch."""
+        goal = self.home_pose
+        q0 = np.asarray(current_q, dtype=np.float64)
+        q1 = np.asarray(goal, dtype=np.float64)
+
+        traj = self.planner.generate_trajectory(q0, q1, duration=duration, validate=False)
+        positions = traj.positions.copy()
+
+        tau = traj.times / traj.duration
+        arch = np.sin(np.pi * tau) ** 2
+        positions[:, 1] += 0.35 * arch
+        positions[:, 2] += 0.20 * arch
+
+        vels = np.gradient(positions, traj.dt, axis=0)
+        accs = np.gradient(vels, traj.dt, axis=0)
+
+        return Trajectory(
+            times=traj.times,
+            positions=positions,
+            velocities=vels,
+            accelerations=accs,
+            duration=traj.duration,
+            dt=traj.dt,
         )

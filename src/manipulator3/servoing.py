@@ -34,11 +34,11 @@ class VisualServoController:
 
     def __init__(
         self,
-        k_yaw: float = 0.14,
-        k_pitch: float = 0.12,
-        max_step_rad: float = 0.008,
-        tolerance_norm: float = 0.035,
-        deadband_norm: float = 0.015,
+        k_yaw: float = 0.35,
+        k_pitch: float = 0.30,
+        max_step_rad: float = 0.035,
+        tolerance_norm: float = 0.055,
+        deadband_norm: float = 0.012,
         joint_limits: Optional[Dict[int, Tuple[float, float]]] = None,
     ) -> None:
         self.k_yaw = k_yaw
@@ -93,10 +93,10 @@ class VisualServoController:
         # Anti-windup: do not accumulate setpoint if physical servo lags behind in the same direction
         if actual_q is not None:
             lag_yaw = current_q[JOINT_YAW] - actual_q[JOINT_YAW]
-            if abs(lag_yaw) > 0.02 and (dq_yaw * lag_yaw > 0):
+            if abs(lag_yaw) > 0.08 and (dq_yaw * lag_yaw > 0):
                 dq_yaw = 0.0
             lag_pitch = current_q[JOINT_PITCH] - actual_q[JOINT_PITCH]
-            if abs(lag_pitch) > 0.02 and (dq_pitch * lag_pitch > 0):
+            if abs(lag_pitch) > 0.08 and (dq_pitch * lag_pitch > 0):
                 dq_pitch = 0.0
 
         new_q[JOINT_YAW] += dq_yaw
