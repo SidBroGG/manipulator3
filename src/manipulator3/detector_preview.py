@@ -15,6 +15,7 @@ from manipulator3.servoing import (
     VisualSearchTracker,
     TrackingState,
 )
+from manipulator3.model import ARM_JOINTS
 from manipulator3.simulation import SimulationEnvironment, draw_sensor_overlay
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -43,9 +44,10 @@ def main() -> None:
     active_detector = color_detector
     active_mode = "COLOR"
 
+
     tracker = VisualSearchTracker(
         detector=active_detector,
-        servo_controller=VisualServoController(k_yaw=0.35, k_pitch=0.30),
+        servo_controller=VisualServoController(k_yaw=0.16, k_pitch=0.14, max_step_rad=0.018),
         scanner=SectorScanner(),
     )
 
@@ -57,8 +59,11 @@ def main() -> None:
     while True:
         t0 = time.perf_counter()
 
-        # Step simulation physics
-        env.step(5)
+        # Step simulation physics (~30ms per frame to match display FPS)
+        env.step(15)
+
+        # Retrieve actual joint positions for smooth anti-windup control
+        actual_q = np.array([env.data.qpos[env.joint_map[j]] for j in ARM_JOINTS], dtype=np.float64)
 
         # Render feeds
         gripper_frame = env.render_bgr("gripper_camera")
@@ -67,7 +72,7 @@ def main() -> None:
 
         # Update tracker & servoing if active
         if auto_servo:
-            new_q, state, best_target = tracker.update(gripper_frame, current_q)
+            new_q, state, best_target = tracker.update(gripper_frame, current_q, actual_q=actual_q)
             current_q = new_q
             env.set_actuator_targets(current_q)
         else:

@@ -30,21 +30,32 @@ class TrackingState(str, Enum):
 
 
 class VisualServoController:
-    """Proportional visual servoing controller for centering target object in gripper camera."""
+    """Proportional visual servoing controller with anti-windup and error damping."""
 
     def __init__(
         self,
-        k_yaw: float = 0.35,
-        k_pitch: float = 0.30,
-        max_step_rad: float = 0.08,
-        tolerance_norm: float = 0.04,
+        k_yaw: float = 0.16,
+        k_pitch: float = 0.14,
+        max_step_rad: float = 0.018,
+        tolerance_norm: float = 0.035,
+        deadband_norm: float = 0.012,
+        smoothing_alpha: float = 0.4,
         joint_limits: Optional[Dict[int, Tuple[float, float]]] = None,
     ) -> None:
         self.k_yaw = k_yaw
         self.k_pitch = k_pitch
         self.max_step_rad = max_step_rad
         self.tolerance_norm = tolerance_norm
+        self.deadband_norm = deadband_norm
+        self.smoothing_alpha = smoothing_alpha
         self.joint_limits = joint_limits or DEFAULT_JOINT_LIMITS
+        self._filtered_eu: Optional[float] = None
+        self._filtered_ev: Optional[float] = None
+
+    def reset(self) -> None:
+        """Reset internal filter states."""
+        self._filtered_eu = None
+        self._filtered_ev = None
 
     def is_centered(self, target: DetectedObject) -> bool:
         """Check if target center is within normalized tolerance deadband."""
@@ -52,24 +63,48 @@ class VisualServoController:
         return abs(eu) <= self.tolerance_norm and abs(ev) <= self.tolerance_norm
 
     def compute_joint_deltas(self, target: DetectedObject) -> Tuple[float, float]:
-        """Compute (dq_yaw, dq_pitch) joint increments to drive visual error to zero."""
-        eu, ev = target.norm_center
-        # Negative proportional law: positive error requires negative joint delta
-        dq_yaw = float(np.clip(-self.k_yaw * eu, -self.max_step_rad, self.max_step_rad))
-        dq_pitch = float(np.clip(-self.k_pitch * ev, -self.max_step_rad, self.max_step_rad))
+        """Compute (dq_yaw, dq_pitch) joint increments with smoothing and deadband."""
+        raw_eu, raw_ev = target.norm_center
+
+        if self._filtered_eu is None:
+            self._filtered_eu = raw_eu
+            self._filtered_ev = raw_ev
+        else:
+            self._filtered_eu = (
+                self.smoothing_alpha * raw_eu + (1.0 - self.smoothing_alpha) * self._filtered_eu
+            )
+            self._filtered_ev = (
+                self.smoothing_alpha * raw_ev + (1.0 - self.smoothing_alpha) * self._filtered_ev
+            )
+
+        eu, ev = self._filtered_eu, self._filtered_ev
+
+        dq_yaw = (
+            float(np.clip(-self.k_yaw * eu, -self.max_step_rad, self.max_step_rad))
+            if abs(eu) > self.deadband_norm
+            else 0.0
+        )
+        dq_pitch = (
+            float(np.clip(-self.k_pitch * ev, -self.max_step_rad, self.max_step_rad))
+            if abs(ev) > self.deadband_norm
+            else 0.0
+        )
         return dq_yaw, dq_pitch
 
     def step(
         self,
         target: DetectedObject,
         current_q: np.ndarray,
+        actual_q: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, bool]:
         """
-        Perform one visual servo control step.
+        Perform one visual servo control step with anti-windup.
         Returns:
             (new_q, is_aligned): updated joint angles and alignment boolean flag.
         """
-        new_q = np.asarray(current_q, dtype=np.float64).copy()
+        base_q = actual_q if actual_q is not None else current_q
+        new_q = np.asarray(base_q, dtype=np.float64).copy()
+
         if self.is_centered(target):
             return new_q, True
 
@@ -214,6 +249,7 @@ class VisualSearchTracker:
         self,
         frame: np.ndarray,
         current_q: np.ndarray,
+        actual_q: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, TrackingState, Optional[DetectedObject]]:
         """
         Process incoming frame and current joint configuration.
@@ -226,9 +262,11 @@ class VisualSearchTracker:
         if best_target is not None:
             # Target acquired -> switch to or maintain visual centering
             self.lost_counter = 0
-            new_q, is_aligned = self.servo.step(best_target, current_q)
+            new_q, is_aligned = self.servo.step(best_target, current_q, actual_q=actual_q)
             self.state = TrackingState.ALIGNED if is_aligned else TrackingState.CENTERING
             return new_q, self.state, best_target
+
+        self.servo.reset()
 
         # No target detected in frame
         if self.state in (TrackingState.CENTERING, TrackingState.ALIGNED):
