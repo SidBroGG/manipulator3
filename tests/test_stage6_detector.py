@@ -42,6 +42,20 @@ def test_detected_object_geometry():
     assert det.norm_center[1] == pytest.approx(-0.375)
 
 
+def test_gripper_finger_exclusion():
+    """Verify that gripper fingers visible at frame borders are identified and excluded."""
+    from manipulator3.detector import is_gripper_finger, EXCLUDED_ROBOT_CLASSES
+
+    # Left gripper jaw
+    assert is_gripper_finger((0.2, 157.0, 78.6, 284.6), 640, 480) is True
+    # Right gripper jaw
+    assert is_gripper_finger((590.6, 153.5, 639.8, 278.2), 640, 480) is True
+    # Valid target in table center
+    assert is_gripper_finger((280.0, 200.0, 360.0, 280.0), 640, 480) is False
+
+    assert "traffic light" in EXCLUDED_ROBOT_CLASSES
+
+
 def test_yolo_benchmark_inference():
     """6.3.1 Benchmark YOLO11n inference latency on CPU."""
     detector = YOLOObjectDetector()

@@ -19,6 +19,42 @@ DEFAULT_PICKABLE_CLASSES = {
     "cell phone", "mouse", "remote", "keyboard", "toothbrush",
 }
 
+# Classes that must never be detected as target table objects (infrastructure, vehicles, people, furniture)
+EXCLUDED_ROBOT_CLASSES = {
+    "traffic light", "stop sign", "parking meter", "bench", "fire hydrant",
+    "car", "bus", "truck", "train", "airplane", "boat", "motorcycle", "bicycle",
+    "person", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear",
+    "zebra", "giraffe", "chair", "couch", "bed", "toilet", "refrigerator", "sink",
+}
+
+
+def is_gripper_finger(
+    box: Tuple[float, float, float, float],
+    frame_width: int,
+    frame_height: int,
+    margin_ratio: float = 0.15,
+) -> bool:
+    """Check if bounding box belongs to gripper jaws visible at lateral camera borders."""
+    x1, y1, x2, y2 = box
+    cx = (x1 + x2) / 2.0
+
+    left_margin = frame_width * margin_ratio
+    right_margin = frame_width * (1.0 - margin_ratio)
+
+    # Left gripper jaw
+    if x2 <= left_margin:
+        return True
+    if x1 <= 15.0 and cx <= left_margin:
+        return True
+
+    # Right gripper jaw
+    if x1 >= right_margin:
+        return True
+    if x2 >= (frame_width - 15.0) and cx >= right_margin:
+        return True
+
+    return False
+
 
 @dataclass
 class DetectedObject:
@@ -76,11 +112,15 @@ class YOLOObjectDetector:
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.45,
         target_classes: Optional[Iterable[str]] = None,
+        filter_gripper_fingers: bool = True,
+        gripper_margin_ratio: float = 0.15,
         device: str = "cpu",
     ) -> None:
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.target_classes = set(target_classes) if target_classes is not None else None
+        self.filter_gripper_fingers = filter_gripper_fingers
+        self.gripper_margin_ratio = gripper_margin_ratio
         self.device = device
 
         resolved_path = self._resolve_model_path(model_path)
@@ -136,10 +176,17 @@ class YOLOObjectDetector:
             if self.target_classes is not None and c_name not in self.target_classes:
                 continue
 
+            if c_name in EXCLUDED_ROBOT_CLASSES:
+                continue
+
             xyxy = box_item.xyxy[0].tolist()
             x1, y1, x2, y2 = xyxy
 
-            # Skip edge border artifacts (e.g. gripper fingers at extreme edges)
+            # Skip gripper fingers visible in eye-in-hand camera
+            if self.filter_gripper_fingers and is_gripper_finger((x1, y1, x2, y2), w, h, self.gripper_margin_ratio):
+                continue
+
+            # Skip edge border artifacts
             if exclude_border_px > 0:
                 if x1 < exclude_border_px and x2 < exclude_border_px * 2:
                     continue

@@ -70,6 +70,8 @@ def __getattr__(name: str):
         "ColorBlobDetector",
         "draw_detection_overlay",
         "DEFAULT_PICKABLE_CLASSES",
+        "EXCLUDED_ROBOT_CLASSES",
+        "is_gripper_finger",
     ):
         from manipulator3 import detector
         return getattr(detector, name)
