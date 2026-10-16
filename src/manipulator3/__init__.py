@@ -63,6 +63,24 @@ def __getattr__(name: str):
     ):
         from manipulator3 import pointing
         return getattr(pointing, name)
+    if name in (
+        "DetectedObject",
+        "compute_detected_object",
+        "YOLOObjectDetector",
+        "ColorBlobDetector",
+        "draw_detection_overlay",
+        "DEFAULT_PICKABLE_CLASSES",
+    ):
+        from manipulator3 import detector
+        return getattr(detector, name)
+    if name in (
+        "TrackingState",
+        "VisualServoController",
+        "SectorScanner",
+        "VisualSearchTracker",
+    ):
+        from manipulator3 import servoing
+        return getattr(servoing, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

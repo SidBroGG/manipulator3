@@ -99,4 +99,8 @@
   <sensor>
     <rangefinder name="tof_rangefinder" site="tof_site" cutoff="2.0"/>
   </sensor>
+
+  <contact>
+    <exclude body1="base_link" body2="base_spinning"/>
+  </contact>
 </mujoco>

@@ -91,17 +91,17 @@ Computing is split between:
 ---
 
 ## Stage 6: Perception - Object Detection (YOLO11n) & Search Scanning
-- [ ] **6.1 YOLO11n Integration**
-  - [ ] 6.1.1 Load and initialize `yolo11n.pt` for target object detection on camera frames.
-  - [ ] 6.1.2 Filter bounding boxes and class IDs relevant to pickable table objects.
-  - [ ] 6.1.3 Extract 2D bounding box center and bounding box area/aspect ratio.
-- [ ] **6.2 Out-of-FOV Search Strategy**
-  - [ ] 6.2.1 When target object is not immediately visible, orient arm towards pointing sector from Stage 5.
-  - [ ] 6.2.2 Execute scanning sweep trajectory (yaw sweep + tilt angle adjustment) until YOLO11n detects candidate object.
-  - [ ] 6.2.3 Center target in camera frame using proportional visual servoing (adjusting base yaw and wrist pitch).
-- [ ] **6.3 Stage 6 Unit Tests**
-  - [ ] 6.3.1 Benchmark YOLO11n inference time on CPU/iGPU.
-  - [ ] 6.3.2 Test target tracking centering loop with synthetic simulated frames.
+- [x] **6.1 YOLO11n Integration**
+  - [x] 6.1.1 Load and initialize `yolo11n.pt` for target object detection on camera frames.
+  - [x] 6.1.2 Filter bounding boxes and class IDs relevant to pickable table objects.
+  - [x] 6.1.3 Extract 2D bounding box center and bounding box area/aspect ratio.
+- [x] **6.2 Out-of-FOV Search Strategy**
+  - [x] 6.2.1 When target object is not immediately visible, orient arm towards pointing sector from Stage 5.
+  - [x] 6.2.2 Execute scanning sweep trajectory (yaw sweep + tilt angle adjustment) until YOLO11n detects candidate object.
+  - [x] 6.2.3 Center target in camera frame using proportional visual servoing (adjusting base yaw and wrist pitch).
+- [x] **6.3 Stage 6 Unit Tests**
+  - [x] 6.3.1 Benchmark YOLO11n inference time on CPU/iGPU.
+  - [x] 6.3.2 Test target tracking centering loop with synthetic simulated frames.
 
 ---
 
