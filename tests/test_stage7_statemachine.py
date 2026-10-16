@@ -209,3 +209,27 @@ def test_simulation_e2e_pick_and_place():
         assert displacement > 0.08  # at least 80 mm displacement to drop-off zone
     finally:
         env.close()
+
+
+def test_interactive_pointing_demo_logic():
+    """Verify interactive hand-to-simulation pointing demo logic and object selection."""
+    from manipulator3.interactive import InteractivePointingDemo, TABLE_OBJECTS
+
+    demo = InteractivePointingDemo(camera_id=-1)  # desktop / mouse mode
+    try:
+        # Check camera panel rendering
+        panel, target = demo.process_camera()
+        assert panel.shape == (demo.height, demo.width, 3)
+        assert target is not None
+
+        # Hover near green cylinder (0.16, 0.12)
+        demo.update_hover_and_dwell(np.array([0.16, 0.12]))
+        assert demo.hovered_object == "green_cylinder"
+
+        # Trigger selection
+        demo.trigger_selection()
+        assert demo.sm.state == ManipulatorState.POINTING_DETECTED
+        assert demo.sm.target_name == "green_cylinder"
+    finally:
+        demo.env.close()
+

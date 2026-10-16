@@ -69,6 +69,16 @@
       <freejoint name="yellow_joint"/>
       <geom name="yellow_geom" type="cylinder" size="0.012 0.015" rgba="0.95 0.85 0.1 1.0" mass="0.025" condim="4" friction="2.0 0.1 0.001" solref="0.004 1" solimp="0.95 0.99 0.001 0.5 2"/>
     </body>
+
+    <!-- Visual Hand & Pointing Target Marker (Mocap bodies for interactive tracking) -->
+    <body name="human_hand" mocap="true" pos="0.30 0.0 0.25">
+      <geom name="hand_geom" type="sphere" size="0.018" rgba="1.0 0.5 0.1 0.85" contype="0" conaffinity="0"/>
+      <site name="hand_site" pos="0 0 0" size="0.005" rgba="1 1 1 0.9"/>
+    </body>
+    <body name="pointing_marker" mocap="true" pos="0.18 0.0 0.002">
+      <geom name="marker_geom" type="cylinder" size="0.025 0.002" rgba="1.0 0.2 0.2 0.65" contype="0" conaffinity="0"/>
+      <site name="marker_site" pos="0 0 0" size="0.006" rgba="1 0 0 0.9"/>
+    </body>
   </worldbody>
 
   <include file="manipulator.xml"/>

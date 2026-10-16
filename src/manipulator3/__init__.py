@@ -115,4 +115,5 @@ def main() -> None:
     print("  uv run python examples/hand_preview.py")
     print("  uv run python examples/detector_preview.py")
     print("  uv run python examples/statemachine_preview.py")
+    print("  uv run python examples/interactive_pointing_demo.py")
 

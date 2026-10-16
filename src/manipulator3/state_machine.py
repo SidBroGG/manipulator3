@@ -100,6 +100,13 @@ class PickAndPlaceStateMachine:
         self.lost_frames_count = 0
         self.grasp_substate = "CLOSE"
 
+    def set_target(self, target_name: str) -> None:
+        """Configure target object name and update detector."""
+        self.target_name = target_name
+        if isinstance(self.detector, ColorBlobDetector):
+            self.detector.target_colors = {target_name}
+        logger.info("Configured state machine target: %s", target_name)
+
     def trigger_pointing(
         self,
         target: Optional[PointingTarget | float] = None,

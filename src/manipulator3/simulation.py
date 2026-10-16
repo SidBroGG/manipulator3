@@ -97,6 +97,22 @@ class SimulationEnvironment:
         """Return main__gripperbase position (3,) and rotation matrix (3, 3)."""
         return get_gripper_pose(self.model, self.data)
 
+    def set_mocap_pose(
+        self,
+        body_name: str,
+        pos: np.ndarray,
+        quat: Optional[np.ndarray] = None,
+    ) -> None:
+        """Set position and optional quaternion orientation for a mocap body."""
+        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        if body_id >= 0:
+            mocap_id = self.model.body_mocapid[body_id]
+            if mocap_id >= 0:
+                self.data.mocap_pos[mocap_id] = np.asarray(pos, dtype=np.float64)
+                if quat is not None:
+                    self.data.mocap_quat[mocap_id] = np.asarray(quat, dtype=np.float64)
+                mujoco.mj_forward(self.model, self.data)
+
     def reset(self) -> None:
         """Reset simulation state to keyframe or initial position."""
         mujoco.mj_resetData(self.model, self.data)
