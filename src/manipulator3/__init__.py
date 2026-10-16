@@ -87,5 +87,11 @@ def __getattr__(name: str):
 
 
 def main() -> None:
-    from manipulator3.zenoh_preview import main as preview_main
-    preview_main()
+    print("Manipulator3 - 6-DOF Robotic Manipulator with Vision & ToF")
+    print("Run interactive examples:")
+    print("  uv run python examples/sim_preview.py")
+    print("  uv run python examples/zenoh_preview.py")
+    print("  uv run python examples/kinematics_preview.py")
+    print("  uv run python examples/hand_preview.py")
+    print("  uv run python examples/detector_preview.py")
+
