@@ -358,6 +358,14 @@ class HandTracker:
             score=score,
         )
 
+    def is_pointing_gesture(
+        self,
+        landmarks: HandLandmarks,
+        angle_threshold_deg: float = 48.0,
+    ) -> Tuple[bool, float]:
+        """Determine if landmarks represent an intentional index pointing gesture."""
+        return is_pointing_gesture(landmarks, angle_threshold_deg=angle_threshold_deg)
+
     def estimate_pointing_target(
         self,
         image: np.ndarray,

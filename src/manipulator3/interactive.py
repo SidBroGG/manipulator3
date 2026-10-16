@@ -10,6 +10,7 @@ from manipulator3.pointing import (
     HandTracker,
     PointingStatus,
     PointingTarget,
+    is_pointing_gesture,
 )
 from manipulator3.simulation import SimulationEnvironment, draw_sensor_overlay
 from manipulator3.state_machine import PickAndPlaceStateMachine, ManipulatorState

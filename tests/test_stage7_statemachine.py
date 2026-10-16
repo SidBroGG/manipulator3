@@ -230,6 +230,17 @@ def test_interactive_pointing_demo_logic():
         demo.trigger_selection()
         assert demo.sm.state == ManipulatorState.POINTING_DETECTED
         assert demo.sm.target_name == "green_cylinder"
+
+        # Verify hand_tracker is_pointing_gesture method
+        from manipulator3.pointing import HandLandmarks
+        lms = np.zeros((21, 3))
+        lms[5] = [0.02, 0.08, 0.0]
+        lms[6] = [0.02, 0.12, 0.0]
+        lms[7] = [0.02, 0.15, 0.0]
+        lms[8] = [0.02, 0.18, 0.0]
+        hl = HandLandmarks(landmarks=lms, world_landmarks=lms)
+        is_pt, _ = demo.hand_tracker.is_pointing_gesture(hl)
+        assert is_pt is True
     finally:
         demo.env.close()
 
