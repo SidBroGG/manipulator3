@@ -249,17 +249,17 @@ def transform_ray_camera_to_world(
 
 def is_pointing_gesture(
     landmarks: HandLandmarks,
-    angle_threshold_deg: float = 40.0,
+    angle_threshold_deg: float = 48.0,
 ) -> Tuple[bool, float]:
     """
     Determine if hand landmarks represent an intentional index-finger pointing gesture.
-    Verifies that index finger is extended and straight while other fingers are relatively curled.
+    Robustly checks index extension and straightness across both 3D metric and 2D normalized space.
     """
     # 1. Straightness of index finger (MCP -> PIP vs PIP -> TIP)
     v1 = landmarks.index_pip - landmarks.index_mcp
     v2 = landmarks.index_tip - landmarks.index_pip
-    n1 = np.linalg.norm(v1)
-    n2 = np.linalg.norm(v2)
+    n1 = float(np.linalg.norm(v1))
+    n2 = float(np.linalg.norm(v2))
     if n1 < 1e-5 or n2 < 1e-5:
         return False, 0.0
 
@@ -268,15 +268,20 @@ def is_pointing_gesture(
     if angle_deg > angle_threshold_deg:
         return False, 0.0
 
-    # 2. Extension of index finger compared to wrist
+    # 2. Extension check: index finger compared to middle and pinky fingers (both 3D and 2D)
     d_wrist_index_tip = float(np.linalg.norm(landmarks.index_tip - landmarks.wrist))
-    d_wrist_index_pip = float(np.linalg.norm(landmarks.index_pip - landmarks.wrist))
-    if d_wrist_index_tip <= d_wrist_index_pip * 1.1:
-        return False, 0.0
-
-    # 3. Middle finger is curled relative to index tip
     d_wrist_middle_tip = float(np.linalg.norm(landmarks.middle_tip - landmarks.wrist))
-    is_pointing = d_wrist_index_tip > d_wrist_middle_tip * 1.15
+    d_wrist_pinky_tip = float(np.linalg.norm(landmarks.pinky_tip - landmarks.wrist))
+
+    # Normalized 2D screen coordinates
+    s_idx = float(np.linalg.norm(landmarks.landmarks[8][:2] - landmarks.landmarks[5][:2]))
+    s_mid = float(np.linalg.norm(landmarks.landmarks[12][:2] - landmarks.landmarks[9][:2]))
+    s_pinky = float(np.linalg.norm(landmarks.landmarks[20][:2] - landmarks.landmarks[17][:2]))
+
+    is_longer_than_middle = (d_wrist_index_tip > d_wrist_middle_tip * 1.04) or (s_idx > s_mid * 1.06)
+    is_longer_than_pinky = (d_wrist_index_tip > d_wrist_pinky_tip * 1.08) or (s_idx > s_pinky * 1.10)
+
+    is_pointing = bool(is_longer_than_middle and is_longer_than_pinky)
     confidence = float(np.clip((cos_angle + 1.0) / 2.0, 0.0, 1.0))
     return is_pointing, confidence
 
