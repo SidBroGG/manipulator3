@@ -30,27 +30,34 @@ class TrackingState(str, Enum):
 
 
 class VisualServoController:
-    """Proportional visual servoing controller with anti-windup and position holding."""
+    """Proportional-derivative visual servoing controller with damping and lag compensation."""
 
     def __init__(
         self,
-        k_yaw: float = 0.35,
-        k_pitch: float = 0.30,
-        max_step_rad: float = 0.035,
-        tolerance_norm: float = 0.055,
+        k_yaw: float = 0.20,
+        k_pitch: float = 0.18,
+        kd_yaw: float = 0.12,
+        kd_pitch: float = 0.10,
+        max_step_rad: float = 0.020,
+        tolerance_norm: float = 0.065,
         deadband_norm: float = 0.012,
         joint_limits: Optional[Dict[int, Tuple[float, float]]] = None,
     ) -> None:
         self.k_yaw = k_yaw
         self.k_pitch = k_pitch
+        self.kd_yaw = kd_yaw
+        self.kd_pitch = kd_pitch
         self.max_step_rad = max_step_rad
         self.tolerance_norm = tolerance_norm
         self.deadband_norm = deadband_norm
         self.joint_limits = joint_limits or DEFAULT_JOINT_LIMITS
+        self.prev_eu: Optional[float] = None
+        self.prev_ev: Optional[float] = None
 
     def reset(self) -> None:
         """Reset internal controller state."""
-        pass
+        self.prev_eu = None
+        self.prev_ev = None
 
     def is_centered(self, target: DetectedObject) -> bool:
         """Check if target center is within normalized tolerance deadband."""
@@ -58,19 +65,19 @@ class VisualServoController:
         return abs(eu) <= self.tolerance_norm and abs(ev) <= self.tolerance_norm
 
     def compute_joint_deltas(self, target: DetectedObject) -> Tuple[float, float]:
-        """Compute (dq_yaw, dq_pitch) joint increments with deadband and rate limiting."""
+        """Compute (dq_yaw, dq_pitch) with PD error damping to eliminate oscillations."""
         eu, ev = target.norm_center
 
-        dq_yaw = (
-            float(np.clip(-self.k_yaw * eu, -self.max_step_rad, self.max_step_rad))
-            if abs(eu) > self.deadband_norm
-            else 0.0
-        )
-        dq_pitch = (
-            float(np.clip(-self.k_pitch * ev, -self.max_step_rad, self.max_step_rad))
-            if abs(ev) > self.deadband_norm
-            else 0.0
-        )
+        de_u = (eu - self.prev_eu) if self.prev_eu is not None else 0.0
+        de_v = (ev - self.prev_ev) if self.prev_ev is not None else 0.0
+        self.prev_eu = eu
+        self.prev_ev = ev
+
+        u_yaw = -(self.k_yaw * eu + self.kd_yaw * de_u) if abs(eu) > self.deadband_norm else 0.0
+        u_pitch = -(self.k_pitch * ev + self.kd_pitch * de_v) if abs(ev) > self.deadband_norm else 0.0
+
+        dq_yaw = float(np.clip(u_yaw, -self.max_step_rad, self.max_step_rad))
+        dq_pitch = float(np.clip(u_pitch, -self.max_step_rad, self.max_step_rad))
         return dq_yaw, dq_pitch
 
     def step(
@@ -80,7 +87,7 @@ class VisualServoController:
         actual_q: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, bool]:
         """
-        Perform one visual servo control step with anti-windup.
+        Perform one visual servo control step with lag compensation and stability damping.
         Updates only JOINT_YAW (0) and JOINT_PITCH (3) while preserving other joint setpoints.
         """
         new_q = np.asarray(current_q, dtype=np.float64).copy()
@@ -90,17 +97,15 @@ class VisualServoController:
 
         dq_yaw, dq_pitch = self.compute_joint_deltas(target)
 
-        # Anti-windup: do not accumulate setpoint if physical servo lags behind in the same direction
+        # Smooth update based on actual physical state to eliminate delay-induced overshoot
         if actual_q is not None:
-            lag_yaw = current_q[JOINT_YAW] - actual_q[JOINT_YAW]
-            if abs(lag_yaw) > 0.08 and (dq_yaw * lag_yaw > 0):
-                dq_yaw = 0.0
-            lag_pitch = current_q[JOINT_PITCH] - actual_q[JOINT_PITCH]
-            if abs(lag_pitch) > 0.08 and (dq_pitch * lag_pitch > 0):
-                dq_pitch = 0.0
-
-        new_q[JOINT_YAW] += dq_yaw
-        new_q[JOINT_PITCH] += dq_pitch
+            base_yaw = actual_q[JOINT_YAW]
+            base_pitch = actual_q[JOINT_PITCH]
+            new_q[JOINT_YAW] = 0.5 * current_q[JOINT_YAW] + 0.5 * (base_yaw + dq_yaw)
+            new_q[JOINT_PITCH] = 0.5 * current_q[JOINT_PITCH] + 0.5 * (base_pitch + dq_pitch)
+        else:
+            new_q[JOINT_YAW] += dq_yaw
+            new_q[JOINT_PITCH] += dq_pitch
 
         # Clamp within hardware limits
         lim_yaw = self.joint_limits.get(JOINT_YAW, (-3.14159, 3.14159))

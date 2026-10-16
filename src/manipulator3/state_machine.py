@@ -58,7 +58,7 @@ class PickAndPlaceStateMachine:
         self.kinematics = kinematics_engine or KinematicsEngine()
         self.planner = trajectory_planner or TrajectoryPlanner(self.kinematics)
         self.detector = detector or ColorBlobDetector(target_colors=[target_name] if target_name else None)
-        self.servo = servo_controller or VisualServoController(k_yaw=0.35, k_pitch=0.30, max_step_rad=0.035, tolerance_norm=0.055)
+        self.servo = servo_controller or VisualServoController()
         self.scanner = scanner or SectorScanner()
         self.approach = approach_controller or ToFApproachController(self.kinematics)
         self.grasp = grasp_controller or GraspController(self.kinematics, self.planner)

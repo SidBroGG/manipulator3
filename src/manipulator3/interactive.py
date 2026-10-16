@@ -418,7 +418,7 @@ class InteractivePointingDemo:
                 # Apply controls
                 targets = list(output.commanded_q) + [output.commanded_gripper]
                 self.env.set_actuator_targets(targets)
-                for _ in range(12):
+                for _ in range(16):
                     self.env.step()
 
                 # 4. Render 3D simulation overview
