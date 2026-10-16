@@ -12,7 +12,12 @@ from manipulator3.grasping import (
     GRIPPER_OPEN,
     GRIPPER_GRASP_CMD,
 )
-from manipulator3.kinematics import POSE_HOME, POSE_SCAN, POSE_DROP_OFF, KinematicsEngine
+from manipulator3.kinematics import (
+    POSE_HOME,
+    POSE_SCAN,
+    POSE_DROP_OFF,
+    KinematicsEngine,
+)
 from manipulator3.pointing import PointingTarget
 from manipulator3.servoing import SectorScanner, VisualServoController
 from manipulator3.trajectory import Trajectory, TrajectoryPlanner
@@ -57,7 +62,9 @@ class PickAndPlaceStateMachine:
     ) -> None:
         self.kinematics = kinematics_engine or KinematicsEngine()
         self.planner = trajectory_planner or TrajectoryPlanner(self.kinematics)
-        self.detector = detector or ColorBlobDetector(target_colors=[target_name] if target_name else None)
+        self.detector = detector or ColorBlobDetector(
+            target_colors=[target_name] if target_name else None
+        )
         self.servo = servo_controller or VisualServoController()
         self.scanner = scanner or SectorScanner()
         self.approach = approach_controller or ToFApproachController(self.kinematics)
@@ -119,8 +126,15 @@ class PickAndPlaceStateMachine:
 
         if isinstance(target, PointingTarget):
             # Check reachability if status or is_reachable present
-            if hasattr(target, "is_reachable") and not target.is_reachable and hasattr(target, "status"):
-                if getattr(target.status, "value", str(target.status)) != "TARGET_REACHABLE":
+            if (
+                hasattr(target, "is_reachable")
+                and not target.is_reachable
+                and hasattr(target, "status")
+            ):
+                if (
+                    getattr(target.status, "value", str(target.status))
+                    != "TARGET_REACHABLE"
+                ):
                     logger.warning("Rejected pointing target: not reachable")
                     return
             az = target.azimuth if target.azimuth is not None else 0.0
@@ -143,7 +157,9 @@ class PickAndPlaceStateMachine:
         self.waypoint_idx = 0
         self.state = ManipulatorState.POINTING_DETECTED
         self.state_step_count = 0
-        logger.info("Pointing detected. Target azimuth: %.2f rad, span: %.2f rad", az, span)
+        logger.info(
+            "Pointing detected. Target azimuth: %.2f rad, span: %.2f rad", az, span
+        )
 
     def step(
         self,
@@ -167,11 +183,15 @@ class PickAndPlaceStateMachine:
         elif self.state == ManipulatorState.POINTING_DETECTED:
             if not self.active_waypoints:
                 az = getattr(self.pointing_target, "azimuth", 0.0) or 0.0
-                self.active_waypoints = self.scanner.generate_sweep_waypoints(azimuth_rad=az)
+                self.active_waypoints = self.scanner.generate_sweep_waypoints(
+                    azimuth_rad=az
+                )
             self.waypoint_idx = 0
             self.commanded_q = self.active_waypoints[0].copy()
             self.state = ManipulatorState.SECTOR_SCAN
-            logger.info("Transition -> SECTOR_SCAN (waypoints: %d)", len(self.active_waypoints))
+            logger.info(
+                "Transition -> SECTOR_SCAN (waypoints: %d)", len(self.active_waypoints)
+            )
             return StateMachineOutput(
                 state=self.state,
                 commanded_q=self.commanded_q.copy(),
@@ -188,7 +208,11 @@ class PickAndPlaceStateMachine:
                     self.locked_target = detections[0]
                     self.state = ManipulatorState.VISUAL_ALIGN
                     self.lost_frames_count = 0
-                    logger.info("Target acquired: %s at norm %s. Transition -> VISUAL_ALIGN", self.locked_target.class_name, self.locked_target.norm_center)
+                    logger.info(
+                        "Target acquired: %s at norm %s. Transition -> VISUAL_ALIGN",
+                        self.locked_target.class_name,
+                        self.locked_target.norm_center,
+                    )
                     return StateMachineOutput(
                         state=self.state,
                         commanded_q=self.commanded_q.copy(),
@@ -201,7 +225,9 @@ class PickAndPlaceStateMachine:
                 target_wp = self.active_waypoints[self.waypoint_idx]
                 dist = float(np.linalg.norm(target_wp - current_q))
                 if dist < 0.06:
-                    self.waypoint_idx = (self.waypoint_idx + 1) % len(self.active_waypoints)
+                    self.waypoint_idx = (self.waypoint_idx + 1) % len(
+                        self.active_waypoints
+                    )
                     target_wp = self.active_waypoints[self.waypoint_idx]
 
                 step_dir = target_wp - current_q
@@ -227,15 +253,22 @@ class PickAndPlaceStateMachine:
 
             if best_det is not None:
                 self.lost_frames_count = 0
-                self.commanded_q, is_aligned = self.servo.step(best_det, self.commanded_q, actual_q=actual_q)
+                self.commanded_q, is_aligned = self.servo.step(
+                    best_det, self.commanded_q, actual_q=actual_q
+                )
                 if is_aligned:
-                    logger.info("Visual alignment locked. ToF: %.1f mm. Transition -> TOF_APPROACH", tof_mm)
+                    logger.info(
+                        "Visual alignment locked. ToF: %.1f mm. Transition -> TOF_APPROACH",
+                        tof_mm,
+                    )
                     self.state = ManipulatorState.TOF_APPROACH
                     self.state_step_count = 0
             else:
                 self.lost_frames_count += 1
                 if self.lost_frames_count > self.max_lost_frames:
-                    logger.warning("Target lost during visual alignment, resuming SECTOR_SCAN")
+                    logger.warning(
+                        "Target lost during visual alignment, resuming SECTOR_SCAN"
+                    )
                     self.state = ManipulatorState.SECTOR_SCAN
 
             return StateMachineOutput(
@@ -251,8 +284,14 @@ class PickAndPlaceStateMachine:
 
             ee_pos, _ = self.kinematics.forward_kinematics(current_q)
 
-            if self.approach.is_at_grasp_distance(tof_mm) or (ee_pos[2] <= 0.115 and self.state_step_count >= 3):
-                logger.info("Target reached (ToF: %.1f mm, EE Z: %.3f m). Transition -> GRASP", tof_mm, ee_pos[2])
+            if self.approach.is_at_grasp_distance(tof_mm) or (
+                ee_pos[2] <= 0.115 and self.state_step_count >= 3
+            ):
+                logger.info(
+                    "Target reached (ToF: %.1f mm, EE Z: %.3f m). Transition -> GRASP",
+                    tof_mm,
+                    ee_pos[2],
+                )
                 self.state = ManipulatorState.GRASP
                 self.grasp_substate = "CLOSE"
                 self.commanded_gripper = GRIPPER_GRASP_CMD
@@ -264,9 +303,16 @@ class PickAndPlaceStateMachine:
                     message="Target distance reached",
                 )
 
-            next_q, status = self.approach.compute_approach_step(self.commanded_q, tof_mm)
-            if status == ApproachStatus.TARGET_REACHED or status == ApproachStatus.TABLE_LIMIT:
-                logger.info("Approach concluded (%s). Transition -> GRASP", status.value)
+            next_q, status = self.approach.compute_approach_step(
+                self.commanded_q, tof_mm
+            )
+            if (
+                status == ApproachStatus.TARGET_REACHED
+                or status == ApproachStatus.TABLE_LIMIT
+            ):
+                logger.info(
+                    "Approach concluded (%s). Transition -> GRASP", status.value
+                )
                 self.state = ManipulatorState.GRASP
                 self.grasp_substate = "CLOSE"
                 self.commanded_gripper = GRIPPER_GRASP_CMD
@@ -276,7 +322,10 @@ class PickAndPlaceStateMachine:
                 self.lost_frames_count = 0
             elif status == ApproachStatus.OUT_OF_RANGE:
                 if ee_pos[2] <= 0.130 and self.state_step_count >= 5:
-                    logger.info("Close to target at table Z=%.3fm, concluding approach -> GRASP", ee_pos[2])
+                    logger.info(
+                        "Close to target at table Z=%.3fm, concluding approach -> GRASP",
+                        ee_pos[2],
+                    )
                     self.state = ManipulatorState.GRASP
                     self.grasp_substate = "CLOSE"
                     self.commanded_gripper = GRIPPER_GRASP_CMD
@@ -284,7 +333,9 @@ class PickAndPlaceStateMachine:
                 else:
                     self.lost_frames_count += 1
                     if self.lost_frames_count > 30:
-                        logger.warning("ToF signal lost during approach, returning to VISUAL_ALIGN")
+                        logger.warning(
+                            "ToF signal lost during approach, returning to VISUAL_ALIGN"
+                        )
                         self.state = ManipulatorState.VISUAL_ALIGN
                         self.lost_frames_count = 0
 
@@ -301,20 +352,32 @@ class PickAndPlaceStateMachine:
                 self.state_step_count += 1
                 if self.state_step_count >= 20:
                     is_gripped = self.grasp.verify_grip(gripper_joint_pos)
-                    logger.info("Grip verification: %s (pos=%.4f rad)", is_gripped, gripper_joint_pos)
+                    logger.info(
+                        "Grip verification: %s (pos=%.4f rad)",
+                        is_gripped,
+                        gripper_joint_pos,
+                    )
                     # Plan pre-transfer lift
-                    self.active_trajectory = self.grasp.plan_pre_transfer_lift(self.commanded_q, duration=0.8)
+                    self.active_trajectory = self.grasp.plan_pre_transfer_lift(
+                        self.commanded_q, duration=0.8
+                    )
                     self.traj_step_idx = 0
                     self.grasp_substate = "LIFT"
 
             elif self.grasp_substate == "LIFT":
-                if self.active_trajectory is not None and self.traj_step_idx < len(self.active_trajectory.positions):
-                    self.commanded_q = self.active_trajectory.positions[self.traj_step_idx].copy()
+                if self.active_trajectory is not None and self.traj_step_idx < len(
+                    self.active_trajectory.positions
+                ):
+                    self.commanded_q = self.active_trajectory.positions[
+                        self.traj_step_idx
+                    ].copy()
                     self.traj_step_idx += 1
                 else:
                     logger.info("Pre-transfer lift completed. Transition -> TRANSPORT")
                     self.state = ManipulatorState.TRANSPORT
-                    self.active_trajectory = self.grasp.plan_transport(self.commanded_q, duration=1.5)
+                    self.active_trajectory = self.grasp.plan_transport(
+                        self.commanded_q, duration=1.5
+                    )
                     self.traj_step_idx = 0
 
             return StateMachineOutput(
@@ -326,8 +389,12 @@ class PickAndPlaceStateMachine:
 
         elif self.state == ManipulatorState.TRANSPORT:
             self.commanded_gripper = GRIPPER_GRASP_CMD
-            if self.active_trajectory is not None and self.traj_step_idx < len(self.active_trajectory.positions):
-                self.commanded_q = self.active_trajectory.positions[self.traj_step_idx].copy()
+            if self.active_trajectory is not None and self.traj_step_idx < len(
+                self.active_trajectory.positions
+            ):
+                self.commanded_q = self.active_trajectory.positions[
+                    self.traj_step_idx
+                ].copy()
                 self.traj_step_idx += 1
             else:
                 logger.info("Transport completed. Transition -> RELEASE")
@@ -348,7 +415,9 @@ class PickAndPlaceStateMachine:
             if self.state_step_count >= 15:
                 logger.info("Release complete. Transition -> HOME")
                 self.state = ManipulatorState.HOME
-                self.active_trajectory = self.grasp.plan_return_home(self.commanded_q, duration=1.2)
+                self.active_trajectory = self.grasp.plan_return_home(
+                    self.commanded_q, duration=1.2
+                )
                 self.traj_step_idx = 0
 
             return StateMachineOutput(
@@ -360,8 +429,12 @@ class PickAndPlaceStateMachine:
 
         elif self.state == ManipulatorState.HOME:
             self.commanded_gripper = GRIPPER_OPEN
-            if self.active_trajectory is not None and self.traj_step_idx < len(self.active_trajectory.positions):
-                self.commanded_q = self.active_trajectory.positions[self.traj_step_idx].copy()
+            if self.active_trajectory is not None and self.traj_step_idx < len(
+                self.active_trajectory.positions
+            ):
+                self.commanded_q = self.active_trajectory.positions[
+                    self.traj_step_idx
+                ].copy()
                 self.traj_step_idx += 1
             else:
                 logger.info("Autonomous cycle complete. Returning to IDLE")
@@ -400,13 +473,20 @@ class PickAndPlaceStateMachine:
         else:
             # Default target sector at X=0.18, Y=0.0
             from manipulator3.pointing import PointingTarget
-            self.trigger_pointing(PointingTarget(x_table=0.18, y_table=0.0, is_valid=True, sector_center_rad=0.0))
+
+            self.trigger_pointing(
+                PointingTarget(
+                    x_table=0.18, y_table=0.0, is_valid=True, sector_center_rad=0.0
+                )
+            )
 
         for step_idx in range(max_steps):
             frame = env.render_bgr("gripper_camera")
             tof_mm = env.get_tof_distance_mm()
             jpos = env.get_joint_positions()
-            actual_q = np.array([jpos[f"revolute_{i+1}"] for i in range(5)], dtype=np.float64)
+            actual_q = np.array(
+                [jpos[f"revolute_{i + 1}"] for i in range(5)], dtype=np.float64
+            )
             grip_pos = jpos.get("revolute_7", GRIPPER_OPEN)
 
             output = self.step(

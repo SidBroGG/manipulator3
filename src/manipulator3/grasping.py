@@ -85,7 +85,9 @@ class ToFApproachController:
         target_pos = ee_pos + line_of_sight * step_m
 
         if target_pos[2] < self.min_ee_z:
-            logger.warning("Approach reached table clearance safety limit: Z=%.4fm", target_pos[2])
+            logger.warning(
+                "Approach reached table clearance safety limit: Z=%.4fm", target_pos[2]
+            )
             return current_q.copy(), ApproachStatus.TABLE_LIMIT
 
         try:
@@ -146,7 +148,9 @@ class GraspController:
     ) -> None:
         self.kinematics = kinematics_engine or KinematicsEngine()
         self.planner = trajectory_planner or TrajectoryPlanner(self.kinematics)
-        self.drop_off_pose = drop_off_pose if drop_off_pose is not None else POSE_DROP_OFF.copy()
+        self.drop_off_pose = (
+            drop_off_pose if drop_off_pose is not None else POSE_DROP_OFF.copy()
+        )
         self.home_pose = home_pose if home_pose is not None else POSE_HOME.copy()
         self.lift_height_m = lift_height_m
 
@@ -194,7 +198,9 @@ class GraspController:
         q0 = np.asarray(current_q, dtype=np.float64)
         q1 = np.asarray(goal, dtype=np.float64)
 
-        traj = self.planner.generate_trajectory(q0, q1, duration=duration, validate=False)
+        traj = self.planner.generate_trajectory(
+            q0, q1, duration=duration, validate=False
+        )
         positions = traj.positions.copy()
 
         # Add vertical clearance arch: smooth bell curve peaking in mid-transit
@@ -225,7 +231,9 @@ class GraspController:
         q0 = np.asarray(current_q, dtype=np.float64)
         q1 = np.asarray(goal, dtype=np.float64)
 
-        traj = self.planner.generate_trajectory(q0, q1, duration=duration, validate=False)
+        traj = self.planner.generate_trajectory(
+            q0, q1, duration=duration, validate=False
+        )
         positions = traj.positions.copy()
 
         tau = traj.times / traj.duration

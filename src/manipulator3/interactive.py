@@ -130,7 +130,10 @@ class InteractivePointingDemo:
         self.cap = cv2.VideoCapture(self.camera_id) if self.camera_id >= 0 else None
         self.has_camera = bool(self.cap and self.cap.isOpened())
         if not self.has_camera:
-            logger.info("Webcam ID %d unavailable. Operating in mouse/keyboard mode.", self.camera_id)
+            logger.info(
+                "Webcam ID %d unavailable. Operating in mouse/keyboard mode.",
+                self.camera_id,
+            )
         else:
             logger.info("Opened physical camera device ID %d", self.camera_id)
 
@@ -187,7 +190,12 @@ class InteractivePointingDemo:
             is_reachable=True,
         )
 
-        logger.info("LOCKED ON TARGET: %s at %s (azimuth: %.2f rad)", obj_info["name"], target_pos[:2].round(3), azimuth)
+        logger.info(
+            "LOCKED ON TARGET: %s at %s (azimuth: %.2f rad)",
+            obj_info["name"],
+            target_pos[:2].round(3),
+            azimuth,
+        )
         self.sm.set_target(target_key)
         self.sm.trigger_pointing(target)
 
@@ -207,14 +215,20 @@ class InteractivePointingDemo:
         if min_dist < 0.055 and closest_key is not None:
             obj_target = TABLE_OBJECTS[closest_key]["pos"][:2]
             alpha_snap = float(np.clip(1.0 - (min_dist / 0.055), 0.0, 1.0))
-            result_pos = (1.0 - alpha_snap * 0.85) * raw_table_pos + (alpha_snap * 0.85) * obj_target
+            result_pos = (1.0 - alpha_snap * 0.85) * raw_table_pos + (
+                alpha_snap * 0.85
+            ) * obj_target
 
             if self.hovered_object != closest_key:
                 self.hovered_object = closest_key
                 self.hover_start_time = time.time()
             else:
                 elapsed = time.time() - self.hover_start_time
-                if elapsed >= self.dwell_time_required and self.sm.state == ManipulatorState.IDLE and self.is_gesture_active:
+                if (
+                    elapsed >= self.dwell_time_required
+                    and self.sm.state == ManipulatorState.IDLE
+                    and self.is_gesture_active
+                ):
                     self.trigger_selection()
         elif min_dist < 0.10 and closest_key is not None:
             self.hovered_object = closest_key
@@ -239,10 +253,26 @@ class InteractivePointingDemo:
 
         # Draw header banner with instructions in Russian & English
         cv2.rectangle(panel, (0, 0), (w, 52), (20, 20, 20), -1)
-        status_txt = "POINT FINGER AT AN OBJECT TO PICK IT UP / НАВЕДИТЕ ПАЛЕЦ" if self.sm.state == ManipulatorState.IDLE else f"ACTIVE: {self.sm.state.value}"
-        status_col = (0, 255, 255) if self.sm.state == ManipulatorState.IDLE else (0, 255, 0)
-        cv2.putText(panel, status_txt, (15, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.50, status_col, 1)
-        cv2.putText(panel, "Hold 0.8s on target or press [SPACE] to grasp", (15, 44), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (200, 200, 200), 1)
+        status_txt = (
+            "POINT FINGER AT AN OBJECT TO PICK IT UP / НАВЕДИТЕ ПАЛЕЦ"
+            if self.sm.state == ManipulatorState.IDLE
+            else f"ACTIVE: {self.sm.state.value}"
+        )
+        status_col = (
+            (0, 255, 255) if self.sm.state == ManipulatorState.IDLE else (0, 255, 0)
+        )
+        cv2.putText(
+            panel, status_txt, (15, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.50, status_col, 1
+        )
+        cv2.putText(
+            panel,
+            "Hold 0.8s on target or press [SPACE] to grasp",
+            (15, 44),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.42,
+            (200, 200, 200),
+            1,
+        )
 
         # Draw each object's target disc on camera view
         for key, info in TABLE_OBJECTS.items():
@@ -250,7 +280,7 @@ class InteractivePointingDemo:
             u, v = table_to_screen_u_v(tx, ty)
             cx, cy = int(u * w), int(v * h)
 
-            is_hover = (key == self.hovered_object)
+            is_hover = key == self.hovered_object
             col = info["color_bgr"]
             radius = 28 if is_hover else 20
 
@@ -260,13 +290,33 @@ class InteractivePointingDemo:
 
             # Label banner
             label = f"[{info['key']}] {info['name']}"
-            cv2.putText(panel, label, (cx - 45, cy + radius + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+            cv2.putText(
+                panel,
+                label,
+                (cx - 45, cy + radius + 16),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (255, 255, 255),
+                1,
+            )
 
             # If hovered, draw circular progress ring for dwell lock
             if is_hover and self.sm.state == ManipulatorState.IDLE and is_pointing:
-                dwell_frac = min(1.0, (time.time() - self.hover_start_time) / self.dwell_time_required)
+                dwell_frac = min(
+                    1.0,
+                    (time.time() - self.hover_start_time) / self.dwell_time_required,
+                )
                 end_angle = int(dwell_frac * 360)
-                cv2.ellipse(panel, (cx, cy), (radius + 6, radius + 6), -90, 0, end_angle, (0, 255, 0), 3)
+                cv2.ellipse(
+                    panel,
+                    (cx, cy),
+                    (radius + 6, radius + 6),
+                    -90,
+                    0,
+                    end_angle,
+                    (0, 255, 0),
+                    3,
+                )
 
         # Draw laser cursor at fingertip
         cursor_col = (0, 255, 0) if is_pointing else (0, 160, 255)
@@ -305,9 +355,21 @@ class InteractivePointingDemo:
                         px, py = int(pt[0] * self.width), int(pt[1] * self.height)
                         cv2.circle(annotated, (px, py), 4, (0, 255, 255), -1)
                     # Index finger ray line
-                    p_mcp = (int(landmarks.landmarks[5][0] * self.width), int(landmarks.landmarks[5][1] * self.height))
-                    p_tip = (int(landmarks.landmarks[8][0] * self.width), int(landmarks.landmarks[8][1] * self.height))
-                    cv2.line(annotated, p_mcp, p_tip, (0, 255, 0) if is_pointing else (0, 140, 255), 3)
+                    p_mcp = (
+                        int(landmarks.landmarks[5][0] * self.width),
+                        int(landmarks.landmarks[5][1] * self.height),
+                    )
+                    p_tip = (
+                        int(landmarks.landmarks[8][0] * self.width),
+                        int(landmarks.landmarks[8][1] * self.height),
+                    )
+                    cv2.line(
+                        annotated,
+                        p_mcp,
+                        p_tip,
+                        (0, 255, 0) if is_pointing else (0, 140, 255),
+                        3,
+                    )
 
                     # Fingertip position in screen space
                     tip_u = float(landmarks.landmarks[8][0])
@@ -321,14 +383,23 @@ class InteractivePointingDemo:
                     aim_v = float(np.clip(tip_v + (dy / d_norm) * 0.08, 0.05, 0.95))
 
                     # Apply OneEuroFilter for ultra-smooth anti-jitter screen tracking
-                    filtered_screen = self.screen_crosshair_filter.filter(np.array([aim_u, aim_v]), t_now)
-                    cursor_px = (int(filtered_screen[0] * self.width), int(filtered_screen[1] * self.height))
+                    filtered_screen = self.screen_crosshair_filter.filter(
+                        np.array([aim_u, aim_v]), t_now
+                    )
+                    cursor_px = (
+                        int(filtered_screen[0] * self.width),
+                        int(filtered_screen[1] * self.height),
+                    )
 
                     # Convert filtered screen cursor to tabletop workspace coordinates
-                    raw_tx, raw_ty = screen_u_v_to_table(filtered_screen[0], filtered_screen[1])
+                    raw_tx, raw_ty = screen_u_v_to_table(
+                        filtered_screen[0], filtered_screen[1]
+                    )
 
                     # Snap & dwell
-                    snapped_target = self.update_hover_and_snap(np.array([raw_tx, raw_ty]))
+                    snapped_target = self.update_hover_and_snap(
+                        np.array([raw_tx, raw_ty])
+                    )
                     filt_table = self.table_filter.filter(snapped_target, t_now)
                     self.curr_table_target = filt_table
 
@@ -337,9 +408,13 @@ class InteractivePointingDemo:
                     self.curr_hand_pos = self.hand_pos_filter.filter(hand_world, t_now)
 
                     # Draw on-screen targets and crosshairs
-                    self.draw_augmented_reality_targets(annotated, cursor_px, is_pointing)
+                    self.draw_augmented_reality_targets(
+                        annotated, cursor_px, is_pointing
+                    )
 
-                    azimuth = float(np.arctan2(self.curr_table_target[1], self.curr_table_target[0]))
+                    azimuth = float(
+                        np.arctan2(self.curr_table_target[1], self.curr_table_target[0])
+                    )
                     target = PointingTarget(
                         status=PointingStatus.VALID,
                         point_2d=self.curr_table_target.copy(),
@@ -363,12 +438,16 @@ class InteractivePointingDemo:
             cursor_px = (int(u * self.width), int(v * self.height))
             snapped = self.update_hover_and_snap(np.array([raw_tx, raw_ty]))
             self.curr_table_target = self.table_filter.filter(snapped, t_now)
-            hand_world = np.array([self.curr_table_target[0] + 0.08, self.curr_table_target[1], 0.25])
+            hand_world = np.array(
+                [self.curr_table_target[0] + 0.08, self.curr_table_target[1], 0.25]
+            )
             self.curr_hand_pos = self.hand_pos_filter.filter(hand_world, t_now)
 
         self.draw_augmented_reality_targets(canvas, cursor_px, True)
 
-        azimuth = float(np.arctan2(self.curr_table_target[1], self.curr_table_target[0]))
+        azimuth = float(
+            np.arctan2(self.curr_table_target[1], self.curr_table_target[0])
+        )
         target = PointingTarget(
             status=PointingStatus.VALID,
             point_2d=self.curr_table_target.copy(),
@@ -383,7 +462,9 @@ class InteractivePointingDemo:
         cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
         cv2.setMouseCallback(window_name, self.on_mouse_event)
 
-        logger.info("Interactive demo window started. Move hand in front of camera or press keys [1-4].")
+        logger.info(
+            "Interactive demo window started. Move hand in front of camera or press keys [1-4]."
+        )
 
         prev_time = time.time()
         try:
@@ -398,14 +479,18 @@ class InteractivePointingDemo:
                 self.env.set_mocap_pose("human_hand", self.curr_hand_pos)
                 self.env.set_mocap_pose(
                     "pointing_marker",
-                    np.array([self.curr_table_target[0], self.curr_table_target[1], 0.002]),
+                    np.array(
+                        [self.curr_table_target[0], self.curr_table_target[1], 0.002]
+                    ),
                 )
 
                 # 3. Step state machine
                 gripper_frame = self.env.render_bgr("gripper_camera")
                 tof_mm = self.env.get_tof_distance_mm()
                 jpos = self.env.get_joint_positions()
-                actual_q = np.array([jpos[f"revolute_{i+1}"] for i in range(5)], dtype=np.float64)
+                actual_q = np.array(
+                    [jpos[f"revolute_{i + 1}"] for i in range(5)], dtype=np.float64
+                )
                 grip_pos = jpos.get("revolute_7", 0.40)
 
                 output = self.sm.step(
@@ -429,11 +514,25 @@ class InteractivePointingDemo:
                 pip_frame = cv2.resize(gripper_frame, (pip_w, pip_h))
                 cv2.rectangle(pip_frame, (0, 0), (pip_w - 1, pip_h - 1), (0, 255, 0), 2)
                 tof_str = f"ToF: {tof_mm:.0f} mm" if tof_mm > 0 else "ToF: Clear"
-                cv2.putText(pip_frame, tof_str, (8, pip_h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
-                sim_overview[10 : 10 + pip_h, self.width - pip_w - 10 : self.width - 10] = pip_frame
+                cv2.putText(
+                    pip_frame,
+                    tof_str,
+                    (8, pip_h - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.45,
+                    (0, 255, 255),
+                    1,
+                )
+                sim_overview[
+                    10 : 10 + pip_h, self.width - pip_w - 10 : self.width - 10
+                ] = pip_frame
 
                 # Overlay status in simulation view
-                state_color = (0, 255, 0) if output.state != ManipulatorState.IDLE else (200, 200, 200)
+                state_color = (
+                    (0, 255, 0)
+                    if output.state != ManipulatorState.IDLE
+                    else (200, 200, 200)
+                )
                 cv2.putText(
                     sim_overview,
                     f"FSM: {output.state.value}",
@@ -456,10 +555,16 @@ class InteractivePointingDemo:
                 # Target lock banner in simulation overview
                 if self.hovered_object and self.sm.state == ManipulatorState.IDLE:
                     obj_name = TABLE_OBJECTS[self.hovered_object]["name"]
-                    dwell_pct = min(1.0, (time.time() - self.hover_start_time) / self.dwell_time_required)
+                    dwell_pct = min(
+                        1.0,
+                        (time.time() - self.hover_start_time)
+                        / self.dwell_time_required,
+                    )
                     bar_w = int(dwell_pct * 140)
                     cv2.rectangle(sim_overview, (20, 85), (160, 97), (60, 60, 60), -1)
-                    cv2.rectangle(sim_overview, (20, 85), (20 + bar_w, 97), (0, 255, 0), -1)
+                    cv2.rectangle(
+                        sim_overview, (20, 85), (20 + bar_w, 97), (0, 255, 0), -1
+                    )
                     cv2.putText(
                         sim_overview,
                         f"AIMED: {obj_name}",
@@ -485,7 +590,9 @@ class InteractivePointingDemo:
                     self.trigger_selection()
                 elif key == ord("2"):
                     self.hovered_object = "green_cylinder"
-                    self.curr_table_target = TABLE_OBJECTS["green_cylinder"]["pos"][:2].copy()
+                    self.curr_table_target = TABLE_OBJECTS["green_cylinder"]["pos"][
+                        :2
+                    ].copy()
                     self.trigger_selection()
                 elif key == ord("3"):
                     self.hovered_object = "blue_box"
@@ -493,7 +600,9 @@ class InteractivePointingDemo:
                     self.trigger_selection()
                 elif key == ord("4"):
                     self.hovered_object = "yellow_target"
-                    self.curr_table_target = TABLE_OBJECTS["yellow_target"]["pos"][:2].copy()
+                    self.curr_table_target = TABLE_OBJECTS["yellow_target"]["pos"][
+                        :2
+                    ].copy()
                     self.trigger_selection()
                 elif key == ord("r"):
                     self.env.reset()
