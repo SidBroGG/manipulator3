@@ -101,6 +101,8 @@ def run_zenoh_preview(
     finally:
         if not headless:
             cv2.destroyAllWindows()
+            for _ in range(5):
+                cv2.waitKey(1)
         client.close()
         if bridge_proc and bridge_proc.is_alive():
             bridge_proc.terminate()

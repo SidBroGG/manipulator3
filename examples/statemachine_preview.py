@@ -27,6 +27,7 @@ def main() -> None:
         for step_idx in range(600):
             t0 = time.time()
             frame = env.render_bgr("gripper_camera")
+            overview_frame = env.render_bgr("overview_camera")
             tof_mm = env.get_tof_distance_mm()
             jpos = env.get_joint_positions()
             actual_q = np.array([jpos[f"revolute_{i+1}"] for i in range(5)], dtype=np.float64)
@@ -73,7 +74,21 @@ def main() -> None:
                 1,
             )
 
-            cv2.imshow(window_name, display)
+            # 3D Overview banner
+            cv2.rectangle(overview_frame, (0, 0), (overview_frame.shape[1], 36), (20, 20, 20), -1)
+            cv2.putText(
+                overview_frame,
+                "MuJoCo 3D Tabletop Overview",
+                (10, 24),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (220, 220, 220),
+                1,
+                cv2.LINE_AA,
+            )
+
+            combined = np.hstack([display, overview_frame])
+            cv2.imshow(window_name, combined)
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q") or key == 27:
                 logger.info("User requested exit")
@@ -86,6 +101,8 @@ def main() -> None:
     finally:
         env.close()
         cv2.destroyAllWindows()
+        for _ in range(5):
+            cv2.waitKey(1)
 
 
 if __name__ == "__main__":

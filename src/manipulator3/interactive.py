@@ -613,3 +613,5 @@ class InteractivePointingDemo:
                 self.cap.release()
             self.env.close()
             cv2.destroyAllWindows()
+            for _ in range(5):
+                cv2.waitKey(1)

@@ -1,8 +1,8 @@
 import argparse
+import sys
 import time
 import numpy as np
 import mujoco
-import mujoco.viewer
 import cv2
 
 from manipulator3.simulation import SimulationEnvironment, draw_sensor_overlay
@@ -18,7 +18,11 @@ from manipulator3.kinematics import (
 from manipulator3.trajectory import TrajectoryPlanner
 
 
-def run_kinematics_preview(headless: bool = False, loop: bool = False) -> None:
+def run_kinematics_preview(
+    headless: bool = False,
+    loop: bool = False,
+    native_viewer: bool = False,
+) -> None:
     """Demonstrate Stage 4 IK, smooth trajectory transitions, and safety limits."""
     print("[INFO] Starting Stage 4 Kinematics & Trajectory Preview...")
 
@@ -56,7 +60,17 @@ def run_kinematics_preview(headless: bool = False, loop: bool = False) -> None:
     if not headless:
         cv2.namedWindow(cv_window_name, cv2.WINDOW_AUTOSIZE)
 
-    viewer_ctx = mujoco.viewer.launch_passive(sim.model, sim.data) if not headless else None
+    # Disable native GLFW viewer on macOS to prevent Cocoa main-thread conflicts with OpenCV
+    viewer_ctx = None
+    if native_viewer and not headless:
+        if sys.platform == "darwin":
+            print("[INFO] macOS detected: Using unified OpenCV viewer (native GLFW viewer disabled for Cocoa compatibility).")
+        else:
+            try:
+                import mujoco.viewer
+                viewer_ctx = mujoco.viewer.launch_passive(sim.model, sim.data)
+            except Exception as e:
+                print(f"[WARNING] Native viewer could not be launched: {e}. Using OpenCV viewer.")
 
     # Actuator mappings
     arm_acts = [sim.actuator_map[f"act_{j}"] for j in engine.arm_joints]
@@ -91,17 +105,35 @@ def run_kinematics_preview(headless: bool = False, loop: bool = False) -> None:
                         viewer_ctx.sync()
 
                     if not headless:
-                        frame = sim.render_bgr("overview_camera")
+                        gripper_frame = sim.render_bgr("gripper_camera")
                         tof_dist = sim.get_tof_reading()
                         status = f"{from_name} -> {to_name} ({step_idx}/{len(traj.times)})"
-                        overlay = draw_sensor_overlay(
-                            frame,
+                        left_panel = draw_sensor_overlay(
+                            gripper_frame,
                             tof_distance_m=tof_dist,
                             fps=50.0,
-                            camera_name="overview_camera",
+                            camera_name="gripper_camera",
                             status_text=status,
                         )
-                        cv2.imshow(cv_window_name, overlay)
+
+                        if viewer_ctx is None:
+                            overview_frame = sim.render_bgr("overview_camera")
+                            cv2.rectangle(overview_frame, (0, 0), (overview_frame.shape[1], 36), (20, 20, 20), -1)
+                            cv2.putText(
+                                overview_frame,
+                                f"MuJoCo 3D Overview | {status}",
+                                (10, 24),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.55,
+                                (220, 220, 220),
+                                1,
+                                cv2.LINE_AA,
+                            )
+                            display = np.hstack([left_panel, overview_frame])
+                        else:
+                            display = left_panel
+
+                        cv2.imshow(cv_window_name, display)
                         key = cv2.waitKey(1) & 0xFF
                         if key in (ord("q"), 27):
                             return
@@ -122,6 +154,8 @@ def run_kinematics_preview(headless: bool = False, loop: bool = False) -> None:
             viewer_ctx.close()
         if not headless:
             cv2.destroyAllWindows()
+            for _ in range(5):
+                cv2.waitKey(1)
         sim.close()
         print("[INFO] Kinematics & Trajectory preview finished successfully.")
 
@@ -130,9 +164,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Stage 4 Kinematics & Trajectory Preview")
     parser.add_argument("--headless", action="store_true", help="Run without opening GUI windows")
     parser.add_argument("--loop", action="store_true", help="Continuously loop through poses")
+    parser.add_argument("--native-viewer", action="store_true", help="Launch native GLFW viewer (Linux/Windows only)")
     args = parser.parse_args()
 
-    run_kinematics_preview(headless=args.headless, loop=args.loop)
+    run_kinematics_preview(headless=args.headless, loop=args.loop, native_viewer=args.native_viewer)
 
 
 if __name__ == "__main__":

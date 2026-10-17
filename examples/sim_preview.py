@@ -4,7 +4,6 @@ import time
 import cv2
 import numpy as np
 import mujoco
-import mujoco.viewer
 
 from manipulator3.simulation import SimulationEnvironment, draw_sensor_overlay
 
@@ -13,8 +12,9 @@ def run_preview(
     duration: float = 0.0,
     headless: bool = False,
     initial_camera: str = "gripper_camera",
+    native_viewer: bool = False,
 ) -> None:
-    """Run interactive 3D MuJoCo simulation alongside OpenCV camera preview."""
+    """Run interactive 3D MuJoCo simulation with OpenCV camera preview."""
     print("[INFO] Starting Stage 2 simulation preview...")
     sim = SimulationEnvironment()
 
@@ -34,11 +34,21 @@ def run_preview(
     frame_count = 0
     fps = 0.0
 
-    cv_window_name = "Manipulator3 - Camera & ToF (OV5647)"
+    cv_window_name = "Manipulator3 - Simulation Preview (OV5647 & 3D Overview)"
     if not headless:
         cv2.namedWindow(cv_window_name, cv2.WINDOW_AUTOSIZE)
 
-    viewer_ctx = mujoco.viewer.launch_passive(sim.model, sim.data) if not headless else None
+    # Disable native GLFW viewer on macOS to prevent Cocoa main-thread conflicts with OpenCV
+    viewer_ctx = None
+    if native_viewer and not headless:
+        if sys.platform == "darwin":
+            print("[INFO] macOS detected: Using unified OpenCV viewer (native GLFW viewer disabled for Cocoa compatibility).")
+        else:
+            try:
+                import mujoco.viewer
+                viewer_ctx = mujoco.viewer.launch_passive(sim.model, sim.data)
+            except Exception as e:
+                print(f"[WARNING] Native viewer could not be launched: {e}. Using OpenCV viewer.")
 
     try:
         while True:
@@ -60,7 +70,6 @@ def run_preview(
                 sim.data.ctrl[act_e] = -0.1 - 0.45 * phase
                 sim.data.ctrl[act_w] = 0.2 + 1.25 * phase
                 sim.data.ctrl[act_g] = 0.25 * (1.0 - phase)
-
 
             # Physics stepping
             sim.step(10)
@@ -95,7 +104,26 @@ def run_preview(
                     camera_name=cam_name,
                     status_text=mode_str,
                 )
-                cv2.imshow(cv_window_name, annotated)
+
+                if viewer_ctx is None:
+                    # Multi-panel composite for macOS / standard mode
+                    overview_frame = sim.render_bgr("overview_camera")
+                    cv2.rectangle(overview_frame, (0, 0), (overview_frame.shape[1], 36), (20, 20, 20), -1)
+                    cv2.putText(
+                        overview_frame,
+                        "MuJoCo 3D Tabletop Overview",
+                        (10, 24),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (220, 220, 220),
+                        1,
+                        cv2.LINE_AA,
+                    )
+                    display = np.hstack([annotated, overview_frame])
+                else:
+                    display = annotated
+
+                cv2.imshow(cv_window_name, display)
 
                 key = cv2.waitKey(1) & 0xFF
                 if key in [ord("q"), 27]:  # 'q' or ESC
@@ -115,6 +143,8 @@ def run_preview(
             viewer_ctx.close()
         if not headless:
             cv2.destroyAllWindows()
+            for _ in range(5):
+                cv2.waitKey(1)
         sim.close()
         print("[INFO] Simulation preview finished successfully.")
 
@@ -124,12 +154,14 @@ def main() -> None:
     parser.add_argument("--duration", type=float, default=0.0, help="Run duration in seconds (0 = infinite)")
     parser.add_argument("--headless", action="store_true", help="Run without opening GUI windows")
     parser.add_argument("--camera", type=str, default="gripper_camera", help="Initial camera name")
+    parser.add_argument("--native-viewer", action="store_true", help="Launch native GLFW viewer (Linux/Windows only)")
     args = parser.parse_args()
 
     run_preview(
         duration=args.duration,
         headless=args.headless,
         initial_camera=args.camera,
+        native_viewer=args.native_viewer,
     )
 
 
