@@ -103,6 +103,31 @@ def __getattr__(name: str):
     ):
         from manipulator3 import state_machine
         return getattr(state_machine, name)
+    if name in (
+        "GPIOBackend",
+        "MockGPIOBackend",
+        "LGPIOBackend",
+        "RPiGPIOBackend",
+        "get_default_gpio_backend",
+        "StepperDriverA4988",
+        "ServoConfig",
+        "ServoController",
+        "ToFReaderVL53L0X",
+        "CameraStreamerOV5647",
+        "PIN_STEP",
+        "PIN_DIR",
+        "PIN_SERVO_SHOULDER_A",
+        "PIN_SERVO_SHOULDER_B",
+        "PIN_SERVO_ELBOW",
+        "PIN_SERVO_WRIST_PITCH",
+        "PIN_SERVO_WRIST_ROLL",
+        "PIN_SERVO_GRIPPER",
+    ):
+        from manipulator3 import hardware
+        return getattr(hardware, name)
+    if name == "ThinClient":
+        from manipulator3 import thin_client
+        return getattr(thin_client, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

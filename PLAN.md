@@ -123,18 +123,18 @@ Computing is split between:
 ---
 
 ## Stage 8: Thin Client for Raspberry Pi Zero 2 W
-- [ ] **8.1 RPi Zero 2 W Runtime Environment**
-  - [ ] 8.1.1 Lightweight Python client with minimal dependency footprint (zenoh, picamera2/libcamera, smbus2/vl53l0x, rpi-hardware-pwm or PCA9685 I2C driver).
-- [ ] **8.2 Camera Streamer**
-  - [ ] 8.2.1 Configure OV5647 via `picamera2` at 640x480 @ 15-30 FPS, JPEG compression, published to `manipulator/camera/raw`.
-- [ ] **8.3 ToF Reader Node**
-  - [ ] 8.3.1 Read VL53L0X over I2C at 20-50 Hz, published to `manipulator/tof/range`.
-- [ ] **8.4 Servo Driver Controller**
-  - [ ] 8.4.1 Subscribe to `manipulator/joints/command`.
-  - [ ] 8.4.2 Map radians to calibrated PWM microsecond pulses (500–2500 µs) for each joint servo and gripper.
-  - [ ] 8.4.3 Implement emergency cutoff if Zenoh heartbeat is lost.
-- [ ] **8.5 Stage 8 Unit Tests**
-  - [ ] 8.5.1 Test sensor mock and PWM pulse conversion mapping.
+- [x] **8.1 RPi Zero 2 W Runtime Environment**
+  - [x] 8.1.1 Lightweight Python client with minimal dependency footprint (zenoh, picamera2/libcamera, smbus2/vl53l0x, lgpio / RPi.GPIO / mock).
+- [x] **8.2 Camera Streamer**
+  - [x] 8.2.1 Configure OV5647 via `picamera2` at 640x480 @ 15-30 FPS, JPEG compression, published to `manipulator/camera/raw`.
+- [x] **8.3 ToF Reader Node**
+  - [x] 8.3.1 Read VL53L0X over I2C at 20-50 Hz, published to `manipulator/tof/range`.
+- [x] **8.4 Servo Driver Controller**
+  - [x] 8.4.1 Subscribe to `manipulator/joints/command`.
+  - [x] 8.4.2 Map radians to calibrated PWM microsecond pulses (500–2500 µs) for each joint servo and gripper.
+  - [x] 8.4.3 Implement emergency cutoff if Zenoh heartbeat is lost.
+- [x] **8.5 Stage 8 Unit Tests**
+  - [x] 8.5.1 Test sensor mock and PWM pulse conversion mapping.
 
 ---
 
