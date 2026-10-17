@@ -15,20 +15,20 @@ logger = logging.getLogger(__name__)
 
 # Gripper actuator setpoints and limits (radians)
 GRIPPER_OPEN: float = 0.40
-GRIPPER_GRASP_CMD: float = -0.52
+GRIPPER_GRASP_CMD: float = -0.30
 GRIPPER_CLOSED_EMPTY: float = -0.58
 
 # Contact detection thresholds for revolute_7
-GRIPPER_CONTACT_MIN_RAD: float = -0.48
+GRIPPER_CONTACT_MIN_RAD: float = -0.40
 GRIPPER_CONTACT_MAX_RAD: float = -0.05
 
 # ToF approach parameters (millimeters and meters)
-TOF_TARGET_MIN_MM: float = 25.0
-TOF_TARGET_MAX_MM: float = 42.0
-TOF_TARGET_NOMINAL_MM: float = 35.0
+TOF_TARGET_MIN_MM: float = 20.0
+TOF_TARGET_MAX_MM: float = 65.0
+TOF_TARGET_NOMINAL_MM: float = 55.0
 
 # Software clearance safety boundary for end-effector during angled approach
-TABLE_CLEARANCE_MIN_EE_Z: float = 0.090
+TABLE_CLEARANCE_MIN_EE_Z: float = 0.128
 PRE_TRANSFER_LIFT_M: float = 0.080
 
 
@@ -208,6 +208,7 @@ class GraspController:
         arch = np.sin(np.pi * tau) ** 2
         positions[:, 1] += 0.40 * arch  # lift shoulder
         positions[:, 2] += 0.25 * arch  # lift elbow
+        positions[:, 3] -= 0.65 * arch  # compensate wrist pitch to keep gripper upright
 
         vels = np.gradient(positions, traj.dt, axis=0)
         accs = np.gradient(vels, traj.dt, axis=0)
@@ -240,6 +241,7 @@ class GraspController:
         arch = np.sin(np.pi * tau) ** 2
         positions[:, 1] += 0.35 * arch
         positions[:, 2] += 0.20 * arch
+        positions[:, 3] -= 0.55 * arch
 
         vels = np.gradient(positions, traj.dt, axis=0)
         accs = np.gradient(vels, traj.dt, axis=0)

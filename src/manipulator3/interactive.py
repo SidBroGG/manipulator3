@@ -125,6 +125,7 @@ class InteractivePointingDemo:
         self.env = SimulationEnvironment(width=width, height=height)
         self.hand_tracker = HandTracker()
         self.sm = PickAndPlaceStateMachine(target_name="red_cube")
+        self.curr_grip: float = 0.40
 
         # Camera setup
         self.cap = cv2.VideoCapture(self.camera_id) if self.camera_id >= 0 else None
@@ -500,8 +501,10 @@ class InteractivePointingDemo:
                     gripper_joint_pos=grip_pos,
                 )
 
-                # Apply controls
-                targets = list(output.commanded_q) + [output.commanded_gripper]
+                # Apply controls with smooth gripper velocity ramp
+                diff = output.commanded_gripper - self.curr_grip
+                self.curr_grip += float(np.clip(diff, -0.04, 0.04))
+                targets = list(output.commanded_q) + [self.curr_grip]
                 self.env.set_actuator_targets(targets)
                 for _ in range(16):
                     self.env.step()

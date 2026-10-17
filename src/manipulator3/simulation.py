@@ -51,7 +51,14 @@ class SimulationEnvironment:
 
     def render(self, camera_name: str = "gripper_camera") -> np.ndarray:
         """Render RGB image from specified camera."""
-        self.renderer.update_scene(self.data, camera=camera_name)
+        if camera_name == "gripper_camera":
+            scn_opt = mujoco.MjvOption()
+            scn_opt.geomgroup[0] = 1
+            scn_opt.geomgroup[1] = 1
+            scn_opt.geomgroup[2] = 0  # Hide mocap marker spheres from robot camera
+            self.renderer.update_scene(self.data, camera=camera_name, scene_option=scn_opt)
+        else:
+            self.renderer.update_scene(self.data, camera=camera_name)
         return self.renderer.render()
 
     def render_bgr(self, camera_name: str = "gripper_camera") -> np.ndarray:
@@ -83,8 +90,8 @@ class SimulationEnvironment:
         else:
             n = min(len(targets), len(self.model.actuator_ctrlrange))
             for i in range(n):
-                ctrlrange = self.model.actuator_ctrlrange[i]
-                self.data.ctrl[i] = float(np.clip(targets[i], ctrlrange[0], ctrlrange[1]))
+                act_name = self.model.actuator(i).name
+                self.set_actuator_target(act_name, targets[i])
 
     def get_joint_positions(self) -> Dict[str, float]:
         """Return current positions of all tracked joints in radians."""

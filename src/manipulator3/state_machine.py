@@ -76,7 +76,7 @@ class PickAndPlaceStateMachine:
         self.locked_target: Optional[DetectedObject] = None
 
         self.commanded_q: np.ndarray = POSE_HOME.copy()
-        self.commanded_gripper: float = GRIPPER_OPEN
+        self.commanded_gripper: float = self.open_gripper_command
 
         # Sector sweep tracking
         self.active_waypoints: list[np.ndarray] = []
@@ -92,13 +92,20 @@ class PickAndPlaceStateMachine:
         self.max_lost_frames: int = 8
         self.grasp_substate: str = "CLOSE"
 
+    @property
+    def open_gripper_command(self) -> float:
+        """Target opening angle for gripper (radians). Narrower for blue_box to avoid clipping adjacent objects."""
+        if self.target_name == "blue_box":
+            return 0.28
+        return GRIPPER_OPEN
+
     def reset(self) -> None:
         """Reset state machine to initial IDLE state."""
         self.state = ManipulatorState.IDLE
         self.pointing_target = None
         self.locked_target = None
         self.commanded_q = POSE_HOME.copy()
-        self.commanded_gripper = GRIPPER_OPEN
+        self.commanded_gripper = self.open_gripper_command
         self.active_waypoints.clear()
         self.waypoint_idx = 0
         self.active_trajectory = None
@@ -112,6 +119,13 @@ class PickAndPlaceStateMachine:
         self.target_name = target_name
         if isinstance(self.detector, ColorBlobDetector):
             self.detector.target_colors = {target_name}
+        if self.state in (
+            ManipulatorState.IDLE,
+            ManipulatorState.SECTOR_SCAN,
+            ManipulatorState.VISUAL_ALIGN,
+            ManipulatorState.TOF_APPROACH,
+        ):
+            self.commanded_gripper = self.open_gripper_command
         logger.info("Configured state machine target: %s", target_name)
 
     def trigger_pointing(
@@ -200,7 +214,7 @@ class PickAndPlaceStateMachine:
             )
 
         elif self.state == ManipulatorState.SECTOR_SCAN:
-            self.commanded_gripper = GRIPPER_OPEN
+            self.commanded_gripper = self.open_gripper_command
             # Scan frame for candidates
             if frame is not None:
                 detections = self.detector.detect(frame)
@@ -244,7 +258,7 @@ class PickAndPlaceStateMachine:
             )
 
         elif self.state == ManipulatorState.VISUAL_ALIGN:
-            self.commanded_gripper = GRIPPER_OPEN
+            self.commanded_gripper = self.open_gripper_command
             best_det = None
             if frame is not None:
                 dets = self.detector.detect(frame)
@@ -279,13 +293,13 @@ class PickAndPlaceStateMachine:
             )
 
         elif self.state == ManipulatorState.TOF_APPROACH:
-            self.commanded_gripper = GRIPPER_OPEN
+            self.commanded_gripper = self.open_gripper_command
             self.state_step_count += 1
 
             ee_pos, _ = self.kinematics.forward_kinematics(current_q)
 
             if self.approach.is_at_grasp_distance(tof_mm) or (
-                ee_pos[2] <= 0.115 and self.state_step_count >= 3
+                ee_pos[2] <= self.approach.min_ee_z and self.state_step_count >= 3
             ):
                 logger.info(
                     "Target reached (ToF: %.1f mm, EE Z: %.3f m). Transition -> GRASP",
@@ -321,7 +335,7 @@ class PickAndPlaceStateMachine:
                 self.commanded_q = next_q
                 self.lost_frames_count = 0
             elif status == ApproachStatus.OUT_OF_RANGE:
-                if ee_pos[2] <= 0.130 and self.state_step_count >= 5:
+                if ee_pos[2] <= self.approach.min_ee_z and self.state_step_count >= 5:
                     logger.info(
                         "Close to target at table Z=%.3fm, concluding approach -> GRASP",
                         ee_pos[2],
@@ -399,7 +413,7 @@ class PickAndPlaceStateMachine:
             else:
                 logger.info("Transport completed. Transition -> RELEASE")
                 self.state = ManipulatorState.RELEASE
-                self.commanded_gripper = GRIPPER_OPEN
+                self.commanded_gripper = self.open_gripper_command
                 self.state_step_count = 0
 
             return StateMachineOutput(
@@ -410,7 +424,7 @@ class PickAndPlaceStateMachine:
             )
 
         elif self.state == ManipulatorState.RELEASE:
-            self.commanded_gripper = GRIPPER_OPEN
+            self.commanded_gripper = self.open_gripper_command
             self.state_step_count += 1
             if self.state_step_count >= 15:
                 logger.info("Release complete. Transition -> HOME")
@@ -428,7 +442,7 @@ class PickAndPlaceStateMachine:
             )
 
         elif self.state == ManipulatorState.HOME:
-            self.commanded_gripper = GRIPPER_OPEN
+            self.commanded_gripper = self.open_gripper_command
             if self.active_trajectory is not None and self.traj_step_idx < len(
                 self.active_trajectory.positions
             ):
@@ -442,7 +456,7 @@ class PickAndPlaceStateMachine:
                 return StateMachineOutput(
                     state=self.state,
                     commanded_q=POSE_HOME.copy(),
-                    commanded_gripper=GRIPPER_OPEN,
+                    commanded_gripper=self.open_gripper_command,
                     is_finished=True,
                     message="Cycle completed successfully",
                 )
@@ -480,6 +494,7 @@ class PickAndPlaceStateMachine:
                 )
             )
 
+        curr_grip = self.open_gripper_command
         for step_idx in range(max_steps):
             frame = env.render_bgr("gripper_camera")
             tof_mm = env.get_tof_distance_mm()
@@ -487,7 +502,7 @@ class PickAndPlaceStateMachine:
             actual_q = np.array(
                 [jpos[f"revolute_{i + 1}"] for i in range(5)], dtype=np.float64
             )
-            grip_pos = jpos.get("revolute_7", GRIPPER_OPEN)
+            grip_pos = jpos.get("revolute_7", self.open_gripper_command)
 
             output = self.step(
                 frame=frame,
@@ -496,8 +511,12 @@ class PickAndPlaceStateMachine:
                 gripper_joint_pos=grip_pos,
             )
 
+            # Smooth gripper rate limiting
+            diff = output.commanded_gripper - curr_grip
+            curr_grip += float(np.clip(diff, -0.04, 0.04))
+
             # Apply actuator targets
-            targets = list(output.commanded_q) + [output.commanded_gripper]
+            targets = list(output.commanded_q) + [curr_grip]
             env.set_actuator_targets(targets)
 
             # Step physics

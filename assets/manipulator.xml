@@ -12,7 +12,8 @@
       <geom group="0" type="mesh" contype="1" conaffinity="1" density="1050" rgba="0.8 0.2 0.2 0.0" friction="1.0 0.05 0.001"/>
     </default>
     <default class="gripper_finger">
-      <geom group="0" type="mesh" contype="1" conaffinity="1" condim="4" density="1050" rgba="0.65 0.65 0.65 1.0" friction="3.5 0.15 0.002" solref="0.008 1" solimp="0.95 0.99 0.001 0.5 2"/>
+      <!-- PVC electrical tape over 3D-printed plastic: realistic sliding friction (0.95) with thin compliance (solref=0.008 1) -->
+      <geom group="0" type="mesh" contype="1" conaffinity="1" condim="4" density="1050" rgba="0.65 0.65 0.65 1.0" friction="0.95 0.08 0.002" solref="0.008 1" solimp="0.95 0.99 0.001 0.5 2"/>
     </default>
   </default>
 
@@ -88,12 +89,12 @@
   </equality>
 
   <actuator>
-    <position name="act_revolute_1" joint="revolute_1" kp="20" kv="1" ctrlrange="-3.14159 3.14159"/>
-    <position name="act_revolute_2" joint="revolute_2" kp="30" kv="2" ctrlrange="-1.5708 1.5708"/>
-    <position name="act_revolute_3" joint="revolute_3" kp="25" kv="1.5" ctrlrange="-1.5708 1.5708"/>
+    <position name="act_revolute_1" joint="revolute_1" kp="50" kv="2" ctrlrange="-3.14159 3.14159"/>
+    <position name="act_revolute_2" joint="revolute_2" kp="60" kv="3" ctrlrange="-1.5708 1.5708"/>
+    <position name="act_revolute_3" joint="revolute_3" kp="45" kv="2" ctrlrange="-1.5708 1.5708"/>
     <position name="act_revolute_4" joint="revolute_4" kp="15" kv="1" ctrlrange="-1.5708 1.5708"/>
     <position name="act_revolute_5" joint="revolute_5" kp="10" kv="0.5" ctrlrange="-1.5708 1.5708"/>
-    <position name="act_gripper" joint="revolute_7" kp="75" kv="2.5" ctrlrange="-0.6 0.6"/>
+    <position name="act_gripper" joint="revolute_7" kp="30" kv="1.5" ctrlrange="-0.6 0.6" forcerange="-1.5 1.5"/>
   </actuator>
 
   <sensor>

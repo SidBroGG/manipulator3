@@ -23,6 +23,7 @@ def main() -> None:
     cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
 
     prev_time = time.time()
+    curr_grip = 0.40
     try:
         for step_idx in range(600):
             t0 = time.time()
@@ -40,8 +41,10 @@ def main() -> None:
                 gripper_joint_pos=grip_pos,
             )
 
-            # Control actuators
-            targets = list(output.commanded_q) + [output.commanded_gripper]
+            # Control actuators with smooth gripper velocity ramp
+            diff = output.commanded_gripper - curr_grip
+            curr_grip += float(np.clip(diff, -0.04, 0.04))
+            targets = list(output.commanded_q) + [curr_grip]
             env.set_actuator_targets(targets)
             for _ in range(15):
                 env.step()
