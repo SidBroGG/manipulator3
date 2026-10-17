@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "adafruit-circuitpython-vl53l0x>=3.6.19",
     "eclipse-zenoh>=1.10.1",
     "ikpy>=4.1.0",
     "mediapipe>=1.1.1",
@@ -16,6 +17,7 @@ dependencies = [
     "opencv-python>=5.0.0.93",
     "pytest>=9.1.1",
     "scipy>=1.18.1",
+    "smbus2>=0.6.1",
     "ultralytics>=8.4.177",
 ]
 
