@@ -14,6 +14,27 @@
 ### 1.2 Архитектура системы
 Система разделена на два узла: **Тонкий клиент (RPi Zero 2 W)** и **Вычислительный хост (Ноутбук)**, объединенные через протокол **Zenoh**:
 
+### 1.3 Аппаратный стек и распиновка Thin Client (Raspberry Pi Zero W)
+
+#### Приводы (Actuators)
+* **Поворотное основание (Azimuth Base):** Шаговый двигатель **NEMA 17** под управлением драйвера **A4988**:
+  * `STEP` $\rightarrow$ **GPIO 17**
+  * `DIR` $\rightarrow$ **GPIO 27**
+* **Суставы и клешня (6x PWM Servos):**
+  * `Servo 1 (Талия / Shoulder A)` — **MG996R** $\rightarrow$ **GPIO 26**
+  * `Servo 2 (Талия / Shoulder B)` — **MG996R** $\rightarrow$ **GPIO 29** *(Внимание: механический реверс движения относительно Servo 1, роторы расположены оппозитно)*
+  * `Servo 3 (Локоть / Elbow)` — **MG996R** $\rightarrow$ **GPIO 13**
+  * `Servo 4 (Запястье / Wrist Pitch)` — **MG996R** $\rightarrow$ **GPIO 6**
+  * `Servo 5 (Вращение клешни / Wrist Roll)` — **MG90S** $\rightarrow$ **GPIO 5**
+  * `Servo 6 (Сжатие клешни / Gripper Jaw)` — **MG90S** $\rightarrow$ **GPIO 22**
+
+#### Сенсоры (Sensors)
+* **Лазерный дальномер VL53L0X (I2C):**
+  * `SDA` $\rightarrow$ **GPIO 2**
+  * `SCL` $\rightarrow$ **GPIO 3**
+* **Зрение:** **Raspberry Pi Camera (OV5647)** $\rightarrow$ интерфейс **MIPI CSI** (ленточный шлейф RPi Zero).
+
+---
 ```
 +-----------------------------------------------------------------------------------+
 |                           COMPUTE HOST (Laptop)                                   |
