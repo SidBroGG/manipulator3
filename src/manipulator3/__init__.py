@@ -103,6 +103,25 @@ def __getattr__(name: str):
     ):
         from manipulator3 import state_machine
         return getattr(state_machine, name)
+    if name in (
+        "ServoConfig",
+        "ServoController",
+        "PCA9685Driver",
+        "DEFAULT_SERVO_CONFIGS",
+        "pulse_us_to_pca_ticks",
+    ):
+        from manipulator3 import servo_controller
+        return getattr(servo_controller, name)
+    if name in (
+        "CameraStreamer",
+        "VL53L0XReader",
+        "MockCamera",
+    ):
+        from manipulator3 import rpi_hardware
+        return getattr(rpi_hardware, name)
+    if name == "RPiThinClient":
+        from manipulator3 import rpi_client
+        return getattr(rpi_client, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -116,4 +135,5 @@ def main() -> None:
     print("  uv run python examples/detector_preview.py")
     print("  uv run python examples/statemachine_preview.py")
     print("  uv run python examples/interactive_pointing_demo.py")
+    print("  uv run python examples/rpi_client_preview.py")
 
