@@ -96,10 +96,10 @@ class ThinClient:
         if isinstance(angles, (list, tuple)) and len(angles) > 0:
             self.stepper.set_target_angle(float(angles[0]))
         elif isinstance(angles, dict):
-            if "revolute_1" in angles:
-                self.stepper.set_target_angle(float(angles["revolute_1"]))
-            elif "base" in angles:
-                self.stepper.set_target_angle(float(angles["base"]))
+            for k, v in angles.items():
+                if str(k).lower().strip() in ("revolute_1", "act_revolute_1", "base", "azimuth"):
+                    self.stepper.set_target_angle(float(v))
+                    break
 
         # Arm & gripper joints via servos
         self.servos.set_joint_angles(angles)
