@@ -419,6 +419,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sweep", type=str, help="Sweep specified motor through its range")
     parser.add_argument("--status", action="store_true", help="Print current status table and exit")
     parser.add_argument("--mock", action="store_true", help="Force MockGPIOBackend (for testing on non-RPi)")
+    parser.add_argument(
+        "--pin-shoulder-b",
+        type=int,
+        default=None,
+        help="BCM GPIO pin for Shoulder B (default: PIN_SERVO_SHOULDER_B env or 21/29)",
+    )
     parser.add_argument("-i", "--interactive", action="store_true", help="Launch interactive testing console")
     return parser
 
@@ -428,6 +434,11 @@ def main() -> int:
     args = parser.parse_args()
 
     tester = ServoTester(force_mock=args.mock)
+
+    if args.pin_shoulder_b is not None:
+        tester.servos.configs["shoulder_b"].pin = args.pin_shoulder_b
+        tester.MOTOR_DEFINITIONS["shoulder_b"]["pin"] = args.pin_shoulder_b
+        tester.MOTOR_DEFINITIONS["shoulder"]["pin"] = f"{PIN_SERVO_SHOULDER_A},{args.pin_shoulder_b}"
 
     if args.status:
         tester.print_status_table()

@@ -18,15 +18,17 @@ np = _load_optional_module("numpy")
 
 logger = logging.getLogger(__name__)
 
-# Hardware GPIO Pinout as defined in GEMINI.md
-PIN_STEP = 17
-PIN_DIR = 27
-PIN_SERVO_SHOULDER_A = 26
-PIN_SERVO_SHOULDER_B = 29
-PIN_SERVO_ELBOW = 13
-PIN_SERVO_WRIST_PITCH = 6
-PIN_SERVO_WRIST_ROLL = 5
-PIN_SERVO_GRIPPER = 22
+import os
+
+# Hardware GPIO Pinout as defined in GEMINI.md (with env overrides)
+PIN_STEP = int(os.environ.get("PIN_STEP", "17"))
+PIN_DIR = int(os.environ.get("PIN_DIR", "27"))
+PIN_SERVO_SHOULDER_A = int(os.environ.get("PIN_SERVO_SHOULDER_A", "26"))
+PIN_SERVO_SHOULDER_B = int(os.environ.get("PIN_SERVO_SHOULDER_B", "29"))
+PIN_SERVO_ELBOW = int(os.environ.get("PIN_SERVO_ELBOW", "13"))
+PIN_SERVO_WRIST_PITCH = int(os.environ.get("PIN_SERVO_WRIST_PITCH", "6"))
+PIN_SERVO_WRIST_ROLL = int(os.environ.get("PIN_SERVO_WRIST_ROLL", "5"))
+PIN_SERVO_GRIPPER = int(os.environ.get("PIN_SERVO_GRIPPER", "22"))
 
 I2C_SDA = 2
 I2C_SCL = 3
@@ -117,8 +119,25 @@ class PiGPIOBackend(GPIOBackend):
         if not self.pi.connected:
             raise ConnectionError("pigpiod daemon is not running. Run: sudo systemctl start pigpiod")
         self.active_pins: List[int] = []
+        self._warned_pins: set = set()
+
+    def _is_valid_user_gpio(self, pin: int) -> bool:
+        if not (0 <= pin <= 27):
+            if pin not in self._warned_pins:
+                self._warned_pins.add(pin)
+                logger.warning(
+                    f"[ERROR] GPIO {pin} is out of range for Raspberry Pi 40-pin header (valid BCM: 0-27). "
+                    f"Note: BCM 29 does not exist on the header. "
+                    f"If you plugged into WiringPi pin 29, the BCM GPIO is 21 (Physical Pin 40). "
+                    f"If Physical Pin 29, it is BCM 5. "
+                    f"Override with: export PIN_SERVO_SHOULDER_B=21 (or your actual BCM pin)."
+                )
+            return False
+        return True
 
     def setup_output(self, pin: int) -> None:
+        if not self._is_valid_user_gpio(pin):
+            return
         try:
             self.pi.set_mode(pin, self.pigpio.OUTPUT)
             if pin not in self.active_pins:
@@ -127,6 +146,8 @@ class PiGPIOBackend(GPIOBackend):
             logger.warning(f"[WARNING] pigpio failed to setup pin {pin}: {e}")
 
     def write_digital(self, pin: int, value: int) -> None:
+        if not self._is_valid_user_gpio(pin):
+            return
         try:
             self.pi.write(pin, int(value))
         except Exception:
@@ -145,6 +166,8 @@ class PiGPIOBackend(GPIOBackend):
 
     def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
         """Direct DMA hardware-timed servo pulse width in microseconds (500-2500 us, 0=off)."""
+        if not self._is_valid_user_gpio(pin):
+            return
         if pin not in self.active_pins:
             self.setup_output(pin)
         try:
@@ -153,6 +176,8 @@ class PiGPIOBackend(GPIOBackend):
             logger.warning(f"[WARNING] pigpio failed to set servo pulse on pin {pin}: {e}")
 
     def stop_pwm(self, pin: int) -> None:
+        if not self._is_valid_user_gpio(pin):
+            return
         try:
             self.pi.set_servo_pulsewidth(pin, 0)
         except Exception:
