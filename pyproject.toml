@@ -10,15 +10,29 @@ requires-python = ">=3.12"
 dependencies = [
     "adafruit-circuitpython-vl53l0x>=3.6.19",
     "eclipse-zenoh>=1.10.1",
+    "numpy>=1.24.0",
+    "opencv-python>=4.6.0",
+    "smbus2>=0.6.1",
+]
+
+[project.optional-dependencies]
+host = [
     "ikpy>=4.1.0",
     "mediapipe>=1.1.1",
     "mujoco>=3.16.0",
-    "numpy>=2.5.4",
-    "opencv-python>=5.0.0.93",
-    "pytest>=9.1.1",
     "scipy>=1.18.1",
-    "smbus2>=0.6.1",
     "ultralytics>=8.4.177",
+]
+dev = [
+    "pytest>=9.1.1",
+]
+full = [
+    "ikpy>=4.1.0",
+    "mediapipe>=1.1.1",
+    "mujoco>=3.16.0",
+    "scipy>=1.18.1",
+    "ultralytics>=8.4.177",
+    "pytest>=9.1.1",
 ]
 
 [project.scripts]

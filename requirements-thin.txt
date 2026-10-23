@@ -1,0 +1,7 @@
+# Thin Client lightweight dependencies for Raspberry Pi Zero W / Zero 2 W
+# (Excludes heavy host perception libraries: mediapipe, mujoco, ikpy, ultralytics)
+eclipse-zenoh>=1.10.1
+smbus2>=0.6.1
+adafruit-circuitpython-vl53l0x>=3.6.19
+numpy>=1.24.0
+opencv-python>=4.6.0

@@ -873,14 +873,28 @@ source = { editable = "." }
 dependencies = [
     { name = "adafruit-circuitpython-vl53l0x" },
     { name = "eclipse-zenoh" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "smbus2" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+]
+full = [
     { name = "ikpy" },
     { name = "mediapipe" },
     { name = "mujoco" },
-    { name = "numpy" },
-    { name = "opencv-python" },
     { name = "pytest" },
     { name = "scipy" },
-    { name = "smbus2" },
+    { name = "ultralytics" },
+]
+host = [
+    { name = "ikpy" },
+    { name = "mediapipe" },
+    { name = "mujoco" },
+    { name = "scipy" },
     { name = "ultralytics" },
 ]
 
@@ -888,16 +902,23 @@ dependencies = [
 requires-dist = [
     { name = "adafruit-circuitpython-vl53l0x", specifier = ">=3.6.19" },
     { name = "eclipse-zenoh", specifier = ">=1.10.1" },
-    { name = "ikpy", specifier = ">=4.1.0" },
-    { name = "mediapipe", specifier = ">=1.1.1" },
-    { name = "mujoco", specifier = ">=3.16.0" },
-    { name = "numpy", specifier = ">=2.5.4" },
-    { name = "opencv-python", specifier = ">=5.0.0.93" },
-    { name = "pytest", specifier = ">=9.1.1" },
-    { name = "scipy", specifier = ">=1.18.1" },
+    { name = "ikpy", marker = "extra == 'full'", specifier = ">=4.1.0" },
+    { name = "ikpy", marker = "extra == 'host'", specifier = ">=4.1.0" },
+    { name = "mediapipe", marker = "extra == 'full'", specifier = ">=1.1.1" },
+    { name = "mediapipe", marker = "extra == 'host'", specifier = ">=1.1.1" },
+    { name = "mujoco", marker = "extra == 'full'", specifier = ">=3.16.0" },
+    { name = "mujoco", marker = "extra == 'host'", specifier = ">=3.16.0" },
+    { name = "numpy", specifier = ">=1.24.0" },
+    { name = "opencv-python", specifier = ">=4.6.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1" },
+    { name = "pytest", marker = "extra == 'full'", specifier = ">=9.1.1" },
+    { name = "scipy", marker = "extra == 'full'", specifier = ">=1.18.1" },
+    { name = "scipy", marker = "extra == 'host'", specifier = ">=1.18.1" },
     { name = "smbus2", specifier = ">=0.6.1" },
-    { name = "ultralytics", specifier = ">=8.4.177" },
+    { name = "ultralytics", marker = "extra == 'full'", specifier = ">=8.4.177" },
+    { name = "ultralytics", marker = "extra == 'host'", specifier = ">=8.4.177" },
 ]
+provides-extras = ["host", "dev", "full"]
 
 [[package]]
 name = "markupsafe"

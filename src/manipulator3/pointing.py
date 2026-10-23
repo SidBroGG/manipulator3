@@ -296,13 +296,18 @@ class HandTracker:
         min_presence_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
     ):
-        import mediapipe as mp
-        from mediapipe.tasks.python import BaseOptions
-        from mediapipe.tasks.python.vision import (
-            HandLandmarker,
-            HandLandmarkerOptions,
-            RunningMode,
-        )
+        try:
+            import mediapipe as mp
+            from mediapipe.tasks.python import BaseOptions
+            from mediapipe.tasks.python.vision import (
+                HandLandmarker,
+                HandLandmarkerOptions,
+                RunningMode,
+            )
+        except ImportError as e:
+            raise ImportError(
+                "mediapipe is not installed. It is only required on the compute host for HandTracker, not on the thin client."
+            ) from e
 
         self._mp = mp
         self.model_path = ensure_model_asset(model_path)
