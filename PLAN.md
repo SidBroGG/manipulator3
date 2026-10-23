@@ -143,7 +143,7 @@ Computing is split between:
   - [ ] 9.1.1 Calibrate camera intrinsic parameters and eye-in-hand offset matrix relative to `main__gripperbase`.
   - [ ] 9.1.2 Calibrate VL53L0X optical axis offset relative to gripper center and camera frame.
 - [ ] **9.2 Servo Zero-Offset & Range Calibration**
-  - [ ] 9.2.1 Calibrate physical zero angles and directional signs for all 6 servos to match URDF coordinates.
+  - [x] 9.2.1 Calibrate physical zero angles and directional signs for all 6 servos to match URDF coordinates.
 - [ ] **9.3 End-to-End Real World Validation**
   - [ ] 9.3.1 Point finger at object on table -> manipulator scans -> centers -> approaches via ToF -> grasps -> transports to base area.
   - [ ] 9.3.2 Latency, reliability, and edge-case tuning.

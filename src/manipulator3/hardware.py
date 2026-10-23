@@ -366,6 +366,12 @@ class ServoController:
             "revolute_4": 0.0,
             "revolute_5": 0.0,
             "revolute_7": 0.0,
+            "shoulder_a": 0.0,
+            "shoulder_b": 0.0,
+            "elbow": 0.0,
+            "wrist_pitch": 0.0,
+            "wrist_roll": 0.0,
+            "gripper": 0.0,
         }
 
         # Setup pins and start at center pulse (1500 us)
@@ -388,7 +394,33 @@ class ServoController:
         self.gpio.set_pwm_duty(cfg_a.pin, duty_a)
         self.gpio.set_pwm_duty(cfg_b.pin, duty_b)
         self.current_angles["revolute_2"] = angle_rad
+        self.current_angles["shoulder_a"] = angle_rad
+        self.current_angles["shoulder_b"] = angle_rad
         return pulse_a, pulse_b
+
+    def set_single_servo(self, servo_name: str, angle_rad: float) -> float:
+        """Set target angle for a single servo channel. Returns pulse width in microseconds."""
+        key = servo_name.lower().strip()
+        if key not in self.configs:
+            raise KeyError(f"Unknown servo: {servo_name}. Valid keys: {list(self.configs.keys())}")
+        cfg = self.configs[key]
+        pulse = cfg.angle_to_pulse_us(angle_rad)
+        duty = cfg.pulse_us_to_duty_cycle(pulse, self.freq_hz)
+        self.gpio.set_pwm_duty(cfg.pin, duty)
+        self.current_angles[key] = angle_rad
+        return pulse
+
+    def relax_servo(self, servo_name: Optional[str] = None) -> None:
+        """Cut off PWM duty cycle to relax holding torque on one or all servos."""
+        if servo_name is None:
+            self.emergency_stop()
+            return
+        key = servo_name.lower().strip()
+        if key in ("shoulder", "revolute_2"):
+            self.gpio.set_pwm_duty(self.configs["shoulder_a"].pin, 0.0)
+            self.gpio.set_pwm_duty(self.configs["shoulder_b"].pin, 0.0)
+        elif key in self.configs:
+            self.gpio.set_pwm_duty(self.configs[key].pin, 0.0)
 
     def set_joint_angle(self, joint_name: str, angle_rad: float) -> float:
         """Set joint angle in radians. Returns pulse width in microseconds."""
@@ -397,33 +429,43 @@ class ServoController:
             p_a, _ = self.set_shoulder_angle(angle_rad)
             return p_a
 
+        if joint_name_norm in ("shoulder_a", "servo_1", "1"):
+            return self.set_single_servo("shoulder_a", angle_rad)
+        if joint_name_norm in ("shoulder_b", "servo_2", "2"):
+            return self.set_single_servo("shoulder_b", angle_rad)
+
         joint_key_map = {
             "revolute_3": ("elbow", "revolute_3"),
             "act_revolute_3": ("elbow", "revolute_3"),
             "elbow": ("elbow", "revolute_3"),
+            "servo_3": ("elbow", "revolute_3"),
+            "3": ("elbow", "revolute_3"),
             "revolute_4": ("wrist_pitch", "revolute_4"),
             "act_revolute_4": ("wrist_pitch", "revolute_4"),
             "wrist_pitch": ("wrist_pitch", "revolute_4"),
             "pitch": ("wrist_pitch", "revolute_4"),
+            "servo_4": ("wrist_pitch", "revolute_4"),
+            "4": ("wrist_pitch", "revolute_4"),
             "revolute_5": ("wrist_roll", "revolute_5"),
             "act_revolute_5": ("wrist_roll", "revolute_5"),
             "wrist_roll": ("wrist_roll", "revolute_5"),
             "roll": ("wrist_roll", "revolute_5"),
+            "servo_5": ("wrist_roll", "revolute_5"),
+            "5": ("wrist_roll", "revolute_5"),
             "revolute_7": ("gripper", "revolute_7"),
             "act_revolute_7": ("gripper", "revolute_7"),
             "gripper": ("gripper", "revolute_7"),
             "act_gripper": ("gripper", "revolute_7"),
             "gripper_joint": ("gripper", "revolute_7"),
+            "servo_6": ("gripper", "revolute_7"),
+            "6": ("gripper", "revolute_7"),
         }
 
         if joint_name_norm not in joint_key_map:
             return 0.0
 
         cfg_key, state_key = joint_key_map[joint_name_norm]
-        cfg = self.configs[cfg_key]
-        pulse = cfg.angle_to_pulse_us(angle_rad)
-        duty = cfg.pulse_us_to_duty_cycle(pulse, self.freq_hz)
-        self.gpio.set_pwm_duty(cfg.pin, duty)
+        pulse = self.set_single_servo(cfg_key, angle_rad)
         self.current_angles[state_key] = angle_rad
         return pulse
 

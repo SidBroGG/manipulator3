@@ -128,6 +128,9 @@ def __getattr__(name: str):
     if name == "ThinClient":
         from manipulator3 import thin_client
         return getattr(thin_client, name)
+    if name == "ServoTester":
+        from manipulator3 import servo_tester
+        return getattr(servo_tester, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
