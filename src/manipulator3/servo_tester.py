@@ -387,7 +387,7 @@ class ServoTester:
                         motor_input = parts[0]
                         angle_val = float(parts[1])
 
-                    res = self.set_motor_angle(motor_input, angle_val, in_degrees=True, smooth=True)
+                    res = self.set_motor_angle(motor_input, angle_val, in_degrees=True, smooth=False)
                     pulse_info = f" | Pulse: {res['pulse_us']} µs ({res['duty_pct']}%)" if res["type"] != "stepper" else ""
                     clamped_info = " [CLAMPED]" if res["clamped"] else ""
                     print(
@@ -406,8 +406,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("-m", "--motor", type=str, help="Motor ID (0-6) or name (e.g. elbow, shoulder, gripper)")
     parser.add_argument("-a", "--angle", type=float, help="Target angle (degrees by default)")
     parser.add_argument("--rad", action="store_true", help="Interpret angle in radians instead of degrees")
-    parser.add_argument("--smooth", action="store_true", help="Move smoothly rather than instant jump")
+    parser.add_argument("--smooth", action="store_true", help="Interpolate movement gradually")
     parser.add_argument("--speed", type=float, default=60.0, help="Smooth movement speed (deg/s)")
+    parser.add_argument(
+        "--hold",
+        type=float,
+        default=2.5,
+        help="Seconds to hold PWM signal active to let servo reach position (default: 2.5s; 0=exit immediately; -1=hold indefinitely until Ctrl+C)",
+    )
     parser.add_argument("--center", action="store_true", help="Center all motors to 0°")
     parser.add_argument("--relax", action="store_true", help="Relax holding torque on all servos")
     parser.add_argument("--sweep", type=str, help="Sweep specified motor through its range")
@@ -435,6 +441,12 @@ def main() -> int:
     if args.center:
         tester.center_all(smooth=args.smooth)
         print("[INFO] All motors centered to 0°.")
+        if args.hold > 0:
+            print(f"[INFO] Holding center position for {args.hold:.1f}s...")
+            try:
+                time.sleep(args.hold)
+            except KeyboardInterrupt:
+                pass
         return 0
 
     if args.sweep:
@@ -457,6 +469,22 @@ def main() -> int:
         print(
             f"[INFO] Motor '{res['key']}' (GPIO {res['pin']}) -> {res['angle_deg']}° ({res['angle_rad']} rad){pulse_info}{clamped_info}"
         )
+
+        # Hold PWM signal so the servo has time to physically travel to target position
+        if args.hold != 0 and res["type"] != "stepper":
+            if args.hold < 0:
+                print("[INFO] Holding position indefinitely. Press Ctrl+C to stop.")
+                try:
+                    while True:
+                        time.sleep(1.0)
+                except KeyboardInterrupt:
+                    print("\n[INFO] Stopped holding.")
+            else:
+                print(f"[INFO] Holding PWM signal for {args.hold:.1f}s to allow servo to reach position...")
+                try:
+                    time.sleep(args.hold)
+                except KeyboardInterrupt:
+                    pass
         return 0
 
     # Default to interactive console

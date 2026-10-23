@@ -102,24 +102,39 @@ class LGPIOBackend(GPIOBackend):
         self.active_pins: List[int] = []
 
     def setup_output(self, pin: int) -> None:
-        self.lgpio.gpio_claim_output(self.handle, pin)
-        if pin not in self.active_pins:
-            self.active_pins.append(pin)
+        try:
+            self.lgpio.gpio_claim_output(self.handle, pin)
+            if pin not in self.active_pins:
+                self.active_pins.append(pin)
+        except Exception as e:
+            logger.warning(f"[WARNING] LGPIO failed to claim output pin {pin}: {e}")
 
     def write_digital(self, pin: int, value: int) -> None:
-        self.lgpio.gpio_write(self.handle, pin, int(value))
+        try:
+            self.lgpio.gpio_write(self.handle, pin, int(value))
+        except Exception:
+            pass
 
     def start_pwm(self, pin: int, freq_hz: float, duty_percent: float) -> None:
-        self.lgpio.tx_pwm(self.handle, pin, int(freq_hz), float(duty_percent))
+        try:
+            self.lgpio.tx_pwm(self.handle, pin, int(freq_hz), float(duty_percent))
+        except Exception as e:
+            logger.warning(f"[WARNING] LGPIO failed to start PWM on pin {pin}: {e}")
 
     def set_pwm_duty(self, pin: int, duty_percent: float) -> None:
-        if duty_percent <= 0.0:
-            self.lgpio.tx_pwm(self.handle, pin, 0, 0)
-        else:
-            self.lgpio.tx_pwm(self.handle, pin, int(DEFAULT_PWM_FREQ_HZ), float(duty_percent))
+        try:
+            if duty_percent <= 0.0:
+                self.lgpio.tx_pwm(self.handle, pin, 0, 0)
+            else:
+                self.lgpio.tx_pwm(self.handle, pin, int(DEFAULT_PWM_FREQ_HZ), float(duty_percent))
+        except Exception:
+            pass
 
     def stop_pwm(self, pin: int) -> None:
-        self.lgpio.tx_pwm(self.handle, pin, 0, 0)
+        try:
+            self.lgpio.tx_pwm(self.handle, pin, 0, 0)
+        except Exception:
+            pass
 
     def cleanup(self) -> None:
         for pin in self.active_pins:
@@ -376,11 +391,17 @@ class ServoController:
             "gripper": 0.0,
         }
 
-        # Setup pins and start at center pulse (1500 us)
-        for cfg in self.configs.values():
-            self.gpio.setup_output(cfg.pin)
-            duty = cfg.pulse_us_to_duty_cycle(cfg.center_pulse_us, self.freq_hz)
-            self.gpio.start_pwm(cfg.pin, self.freq_hz, duty)
+        self._active_pins: set = set()
+
+    def _ensure_pin_active(self, pin: int, initial_duty: float = 7.5) -> None:
+        """Lazily initialize output pin and start PWM only when servo is first commanded."""
+        if pin not in self._active_pins:
+            try:
+                self.gpio.setup_output(pin)
+                self.gpio.start_pwm(pin, self.freq_hz, initial_duty)
+                self._active_pins.add(pin)
+            except Exception as e:
+                logger.warning(f"[WARNING] Could not activate PWM on GPIO {pin}: {e}")
 
     def set_shoulder_angle(self, angle_rad: float) -> Tuple[float, float]:
         """Apply angle to Shoulder A and mechanically reversed Shoulder B. Returns (pulse_a, pulse_b)."""
@@ -393,6 +414,8 @@ class ServoController:
         duty_a = cfg_a.pulse_us_to_duty_cycle(pulse_a, self.freq_hz)
         duty_b = cfg_b.pulse_us_to_duty_cycle(pulse_b, self.freq_hz)
 
+        self._ensure_pin_active(cfg_a.pin, initial_duty=duty_a)
+        self._ensure_pin_active(cfg_b.pin, initial_duty=duty_b)
         self.gpio.set_pwm_duty(cfg_a.pin, duty_a)
         self.gpio.set_pwm_duty(cfg_b.pin, duty_b)
         self.current_angles["revolute_2"] = angle_rad
@@ -408,6 +431,7 @@ class ServoController:
         cfg = self.configs[key]
         pulse = cfg.angle_to_pulse_us(angle_rad)
         duty = cfg.pulse_us_to_duty_cycle(pulse, self.freq_hz)
+        self._ensure_pin_active(cfg.pin, initial_duty=duty)
         self.gpio.set_pwm_duty(cfg.pin, duty)
         self.current_angles[key] = angle_rad
         return pulse
@@ -419,10 +443,16 @@ class ServoController:
             return
         key = servo_name.lower().strip()
         if key in ("shoulder", "revolute_2"):
-            self.gpio.set_pwm_duty(self.configs["shoulder_a"].pin, 0.0)
-            self.gpio.set_pwm_duty(self.configs["shoulder_b"].pin, 0.0)
+            p_a = self.configs["shoulder_a"].pin
+            p_b = self.configs["shoulder_b"].pin
+            if p_a in self._active_pins:
+                self.gpio.set_pwm_duty(p_a, 0.0)
+            if p_b in self._active_pins:
+                self.gpio.set_pwm_duty(p_b, 0.0)
         elif key in self.configs:
-            self.gpio.set_pwm_duty(self.configs[key].pin, 0.0)
+            p = self.configs[key].pin
+            if p in self._active_pins:
+                self.gpio.set_pwm_duty(p, 0.0)
 
     def set_joint_angle(self, joint_name: str, angle_rad: float) -> float:
         """Set joint angle in radians. Returns pulse width in microseconds."""
