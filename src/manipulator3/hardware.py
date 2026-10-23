@@ -51,6 +51,14 @@ class GPIOBackend:
     def set_pwm_duty(self, pin: int, duty_percent: float) -> None:
         raise NotImplementedError
 
+    def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
+        """Set microsecond PWM pulse width for hobby servos. Override in DMA backends."""
+        if pulse_us <= 0.0:
+            self.stop_pwm(pin)
+        else:
+            duty = (pulse_us / (1_000_000.0 / DEFAULT_PWM_FREQ_HZ)) * 100.0
+            self.set_pwm_duty(pin, duty)
+
     def stop_pwm(self, pin: int) -> None:
         raise NotImplementedError
 
@@ -81,6 +89,13 @@ class MockGPIOBackend(GPIOBackend):
             self.pwm_states[pin]["duty"] = duty_percent
             self.pwm_states[pin]["running"] = duty_percent > 0.0
 
+    def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
+        if pulse_us <= 0.0:
+            self.stop_pwm(pin)
+        else:
+            duty = (pulse_us / 20000.0) * 100.0
+            self.set_pwm_duty(pin, duty)
+
     def stop_pwm(self, pin: int) -> None:
         if pin in self.pwm_states:
             self.pwm_states[pin]["running"] = False
@@ -89,6 +104,70 @@ class MockGPIOBackend(GPIOBackend):
     def cleanup(self) -> None:
         self.digital_states.clear()
         self.pwm_states.clear()
+
+
+class PiGPIOBackend(GPIOBackend):
+    """Hardware DMA-timed GPIO backend using pigpio daemon (0% CPU jitter)."""
+
+    def __init__(self, host: str = "localhost", port: int = 8888) -> None:
+        self.pigpio = _load_optional_module("pigpio")
+        if self.pigpio is None:
+            raise ImportError("pigpio module is not installed")
+        self.pi = self.pigpio.pi(host, port)
+        if not self.pi.connected:
+            raise ConnectionError("pigpiod daemon is not running. Run: sudo systemctl start pigpiod")
+        self.active_pins: List[int] = []
+
+    def setup_output(self, pin: int) -> None:
+        try:
+            self.pi.set_mode(pin, self.pigpio.OUTPUT)
+            if pin not in self.active_pins:
+                self.active_pins.append(pin)
+        except Exception as e:
+            logger.warning(f"[WARNING] pigpio failed to setup pin {pin}: {e}")
+
+    def write_digital(self, pin: int, value: int) -> None:
+        try:
+            self.pi.write(pin, int(value))
+        except Exception:
+            pass
+
+    def start_pwm(self, pin: int, freq_hz: float, duty_percent: float) -> None:
+        pulse_us = (duty_percent / 100.0) * (1_000_000.0 / freq_hz)
+        self.set_servo_pulse(pin, pulse_us)
+
+    def set_pwm_duty(self, pin: int, duty_percent: float) -> None:
+        if duty_percent <= 0.0:
+            self.set_servo_pulse(pin, 0.0)
+        else:
+            pulse_us = (duty_percent / 100.0) * 20000.0
+            self.set_servo_pulse(pin, pulse_us)
+
+    def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
+        """Direct DMA hardware-timed servo pulse width in microseconds (500-2500 us, 0=off)."""
+        if pin not in self.active_pins:
+            self.setup_output(pin)
+        try:
+            self.pi.set_servo_pulsewidth(pin, int(round(pulse_us)))
+        except Exception as e:
+            logger.warning(f"[WARNING] pigpio failed to set servo pulse on pin {pin}: {e}")
+
+    def stop_pwm(self, pin: int) -> None:
+        try:
+            self.pi.set_servo_pulsewidth(pin, 0)
+        except Exception:
+            pass
+
+    def cleanup(self) -> None:
+        for pin in self.active_pins:
+            try:
+                self.pi.set_servo_pulsewidth(pin, 0)
+            except Exception:
+                pass
+        try:
+            self.pi.stop()
+        except Exception:
+            pass
 
 
 class LGPIOBackend(GPIOBackend):
@@ -162,20 +241,29 @@ class RPiGPIOBackend(GPIOBackend):
         self.active_pins: List[int] = []
 
     def setup_output(self, pin: int) -> None:
-        self.GPIO.setup(pin, self.GPIO.OUT)
-        if pin not in self.active_pins:
-            self.active_pins.append(pin)
+        try:
+            self.GPIO.setup(pin, self.GPIO.OUT)
+            if pin not in self.active_pins:
+                self.active_pins.append(pin)
+        except Exception as e:
+            logger.warning(f"[WARNING] RPi.GPIO failed to setup pin {pin}: {e}")
 
     def write_digital(self, pin: int, value: int) -> None:
-        self.GPIO.output(pin, self.GPIO.HIGH if value else self.GPIO.LOW)
+        try:
+            self.GPIO.output(pin, self.GPIO.HIGH if value else self.GPIO.LOW)
+        except Exception:
+            pass
 
     def start_pwm(self, pin: int, freq_hz: float, duty_percent: float) -> None:
         if pin not in self.active_pins:
             self.setup_output(pin)
         if pin not in self.pwm_instances:
-            pwm = self.GPIO.PWM(pin, freq_hz)
-            pwm.start(duty_percent)
-            self.pwm_instances[pin] = pwm
+            try:
+                pwm = self.GPIO.PWM(pin, freq_hz)
+                pwm.start(duty_percent)
+                self.pwm_instances[pin] = pwm
+            except Exception as e:
+                logger.warning(f"[WARNING] RPi.GPIO failed to start PWM on pin {pin}: {e}")
         else:
             self.pwm_instances[pin].ChangeDutyCycle(duty_percent)
 
@@ -187,7 +275,10 @@ class RPiGPIOBackend(GPIOBackend):
 
     def stop_pwm(self, pin: int) -> None:
         if pin in self.pwm_instances:
-            self.pwm_instances[pin].stop()
+            try:
+                self.pwm_instances[pin].stop()
+            except Exception:
+                pass
             del self.pwm_instances[pin]
 
     def cleanup(self) -> None:
@@ -204,17 +295,31 @@ class RPiGPIOBackend(GPIOBackend):
 
 
 def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
-    """Return hardware GPIO backend if available, otherwise MockGPIOBackend."""
+    """Return the most precise hardware GPIO backend available."""
     if force_mock:
         return MockGPIOBackend()
 
+    # 1. pigpio: DMA-based hardware PWM (zero jitter on Pi Zero / 1 / 2 / 3 / 4)
     try:
-        return LGPIOBackend()
+        backend = PiGPIOBackend()
+        logger.info("[INFO] Connected to pigpio daemon (DMA hardware PWM, zero jitter).")
+        return backend
     except Exception:
         pass
 
+    # 2. lgpio: Kernel gpiochip PWM (Raspberry Pi OS Bookworm)
     try:
-        return RPiGPIOBackend()
+        backend = LGPIOBackend()
+        logger.info("[INFO] Using LGPIOBackend.")
+        return backend
+    except Exception:
+        pass
+
+    # 3. RPi.GPIO: Legacy software PWM
+    try:
+        backend = RPiGPIOBackend()
+        logger.info("[INFO] Using RPiGPIOBackend.")
+        return backend
     except Exception:
         pass
 
@@ -416,8 +521,8 @@ class ServoController:
 
         self._ensure_pin_active(cfg_a.pin, initial_duty=duty_a)
         self._ensure_pin_active(cfg_b.pin, initial_duty=duty_b)
-        self.gpio.set_pwm_duty(cfg_a.pin, duty_a)
-        self.gpio.set_pwm_duty(cfg_b.pin, duty_b)
+        self.gpio.set_servo_pulse(cfg_a.pin, pulse_a)
+        self.gpio.set_servo_pulse(cfg_b.pin, pulse_b)
         self.current_angles["revolute_2"] = angle_rad
         self.current_angles["shoulder_a"] = angle_rad
         self.current_angles["shoulder_b"] = angle_rad
@@ -432,7 +537,7 @@ class ServoController:
         pulse = cfg.angle_to_pulse_us(angle_rad)
         duty = cfg.pulse_us_to_duty_cycle(pulse, self.freq_hz)
         self._ensure_pin_active(cfg.pin, initial_duty=duty)
-        self.gpio.set_pwm_duty(cfg.pin, duty)
+        self.gpio.set_servo_pulse(cfg.pin, pulse)
         self.current_angles[key] = angle_rad
         return pulse
 

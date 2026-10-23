@@ -93,6 +93,27 @@ def test_servo_angle_clamping():
     assert cfg.angle_to_pulse_us(-10.0) == 500.0
 
 
+def test_pigpio_backend_mock_integration(monkeypatch):
+    """Verify PiGPIOBackend DMA pulse setting with mocked pigpio library."""
+    from unittest.mock import MagicMock
+    from manipulator3.hardware import PiGPIOBackend
+
+    mock_pi = MagicMock()
+    mock_pi.connected = True
+    mock_pigpio_mod = MagicMock()
+    mock_pigpio_mod.pi.return_value = mock_pi
+    mock_pigpio_mod.OUTPUT = 1
+
+    monkeypatch.setattr("manipulator3.hardware._load_optional_module", lambda name: mock_pigpio_mod if name == "pigpio" else None)
+
+    backend = PiGPIOBackend()
+    backend.set_servo_pulse(18, 1500.0)
+    mock_pi.set_servo_pulsewidth.assert_called_with(18, 1500)
+
+    backend.stop_pwm(18)
+    mock_pi.set_servo_pulsewidth.assert_called_with(18, 0)
+
+
 def test_tof_reader_mock_and_range():
     """8.3.1 Verify ToF distance reader returns valid range data."""
     tof = ToFReaderVL53L0X(mock=True)
