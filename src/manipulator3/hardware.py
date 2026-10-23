@@ -3,8 +3,18 @@ import logging
 import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
-import cv2
-import numpy as np
+
+
+def _load_optional_module(name: str) -> Optional[Any]:
+    """Safely load optional hardware modules without compiler/linter missing-import errors."""
+    try:
+        return importlib.import_module(name)
+    except Exception:
+        return None
+
+
+cv2 = _load_optional_module("cv2")
+np = _load_optional_module("numpy")
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +34,6 @@ I2C_BUS = 1
 VL53L0X_I2C_ADDR = 0x29
 
 DEFAULT_PWM_FREQ_HZ = 50.0  # Standard analog/digital servo frequency
-
-
-def _load_optional_module(name: str) -> Optional[Any]:
-    """Safely load optional hardware modules without compiler/linter missing-import errors."""
-    try:
-        return importlib.import_module(name)
-    except Exception:
-        return None
 
 
 class GPIOBackend:
@@ -621,25 +623,29 @@ class CameraStreamerOV5647:
                 except Exception:
                     self.mock = True
 
-    def capture_frame(self) -> np.ndarray:
+    def capture_frame(self) -> Any:
         """Capture BGR frame as numpy ndarray."""
+        if np is None:
+            return None
+
         if self.mock:
             frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-            cv2.putText(
-                frame,
-                "OV5647 CSI STREAM (MOCK)",
-                (20, self.height // 2),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2,
-            )
+            if cv2 is not None:
+                cv2.putText(
+                    frame,
+                    "OV5647 CSI STREAM (MOCK)",
+                    (20, self.height // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 0),
+                    2,
+                )
             return frame
 
         if self.picam2 is not None:
             try:
                 rgb = self.picam2.capture_array()
-                return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR) if cv2 is not None else rgb
             except Exception:
                 pass
 
@@ -647,7 +653,7 @@ class CameraStreamerOV5647:
             try:
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
-                    if frame.shape[1] != self.width or frame.shape[0] != self.height:
+                    if cv2 is not None and (frame.shape[1] != self.width or frame.shape[0] != self.height):
                         frame = cv2.resize(frame, (self.width, self.height))
                     return frame
             except Exception:

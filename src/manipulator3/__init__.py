@@ -1,13 +1,3 @@
-from manipulator3.model import (
-    MJCF_PATH,
-    SCENE_PATH,
-    URDF_PATH,
-    load_mujoco_model,
-    load_mujoco_scene,
-    load_ikpy_chain,
-    get_gripper_pose,
-    get_tof_reading,
-)
 from manipulator3.protocol import (
     TOPIC_CAMERA_RAW,
     TOPIC_TOF_RANGE,
@@ -24,6 +14,18 @@ from manipulator3.protocol import (
 
 
 def __getattr__(name: str):
+    if name in (
+        "MJCF_PATH",
+        "SCENE_PATH",
+        "URDF_PATH",
+        "load_mujoco_model",
+        "load_mujoco_scene",
+        "load_ikpy_chain",
+        "get_gripper_pose",
+        "get_tof_reading",
+    ):
+        from manipulator3 import model
+        return getattr(model, name)
     if name in ("SimulationEnvironment", "draw_sensor_overlay"):
         from manipulator3 import simulation
         return getattr(simulation, name)

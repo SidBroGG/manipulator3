@@ -1,9 +1,19 @@
+import importlib
 from dataclasses import dataclass, field
 import json
 import time
-from typing import Dict, List, Union, Optional
-import cv2
-import numpy as np
+from typing import Any, Dict, List, Union, Optional
+
+
+def _load_optional_module(name: str) -> Optional[Any]:
+    try:
+        return importlib.import_module(name)
+    except Exception:
+        return None
+
+
+cv2 = _load_optional_module("cv2")
+np = _load_optional_module("numpy")
 
 TOPIC_CAMERA_RAW = "manipulator/camera/raw"
 TOPIC_TOF_RANGE = "manipulator/tof/range"
@@ -128,16 +138,20 @@ class RobotStatus:
         return cls.from_dict(json.loads(data.decode("utf-8")))
 
 
-def encode_jpeg(image: np.ndarray, quality: int = 80) -> bytes:
+def encode_jpeg(image: Any, quality: int = 80) -> bytes:
     """Encode OpenCV BGR image to JPEG bytes."""
+    if cv2 is None:
+        raise ImportError("OpenCV (cv2) is required to encode JPEG frames.")
     success, buffer = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
     if not success:
         raise ValueError("Failed to encode frame to JPEG.")
     return buffer.tobytes()
 
 
-def decode_jpeg(data: bytes) -> np.ndarray:
+def decode_jpeg(data: bytes) -> Any:
     """Decode JPEG bytes to OpenCV BGR image."""
+    if cv2 is None or np is None:
+        raise ImportError("OpenCV (cv2) and NumPy are required to decode JPEG frames.")
     arr = np.frombuffer(data, dtype=np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
