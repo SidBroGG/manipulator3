@@ -24,7 +24,7 @@ import os
 PIN_STEP = int(os.environ.get("PIN_STEP", "17"))
 PIN_DIR = int(os.environ.get("PIN_DIR", "27"))
 PIN_SERVO_SHOULDER_A = int(os.environ.get("PIN_SERVO_SHOULDER_A", "26"))
-PIN_SERVO_SHOULDER_B = int(os.environ.get("PIN_SERVO_SHOULDER_B", "29"))
+PIN_SERVO_SHOULDER_B = int(os.environ.get("PIN_SERVO_SHOULDER_B", "19"))
 PIN_SERVO_ELBOW = int(os.environ.get("PIN_SERVO_ELBOW", "13"))
 PIN_SERVO_WRIST_PITCH = int(os.environ.get("PIN_SERVO_WRIST_PITCH", "6"))
 PIN_SERVO_WRIST_ROLL = int(os.environ.get("PIN_SERVO_WRIST_ROLL", "5"))

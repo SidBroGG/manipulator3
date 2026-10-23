@@ -423,7 +423,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--pin-shoulder-b",
         type=int,
         default=None,
-        help="BCM GPIO pin for Shoulder B (default: PIN_SERVO_SHOULDER_B env or 21/29)",
+        help="BCM GPIO pin for Shoulder B (default: PIN_SERVO_SHOULDER_B env or 19 / Pin 35)",
     )
     parser.add_argument("-i", "--interactive", action="store_true", help="Launch interactive testing console")
     return parser

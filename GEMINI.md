@@ -22,7 +22,7 @@
   * `DIR` $\rightarrow$ **GPIO 27**
 * **Суставы и клешня (6x PWM Servos):**
   * `Servo 1 (Талия / Shoulder A)` — **MG996R** $\rightarrow$ **GPIO 26**
-  * `Servo 2 (Талия / Shoulder B)` — **MG996R** $\rightarrow$ **GPIO 29** *(Внимание: механический реверс движения относительно Servo 1, роторы расположены оппозитно)*
+  * `Servo 2 (Талия / Shoulder B)` — **MG996R** $\rightarrow$ **GPIO 19** *(Pin 35, Внимание: механический реверс движения относительно Servo 1, роторы расположены оппозитно)*
   * `Servo 3 (Локоть / Elbow)` — **MG996R** $\rightarrow$ **GPIO 13**
   * `Servo 4 (Запястье / Wrist Pitch)` — **MG996R** $\rightarrow$ **GPIO 6**
   * `Servo 5 (Вращение клешни / Wrist Roll)` — **MG90S** $\rightarrow$ **GPIO 5**
