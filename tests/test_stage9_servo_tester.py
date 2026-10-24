@@ -114,3 +114,40 @@ def test_relax_and_center_all():
     tester.relax()
     for pin in [PIN_SERVO_SHOULDER_A, PIN_SERVO_SHOULDER_B, PIN_SERVO_ELBOW, PIN_SERVO_GRIPPER]:
         assert gpio.pwm_states[pin]["duty"] == 0.0
+
+
+def test_smooth_motion_and_from_angle():
+    """Verify smooth interpolation moves motor through intermediate positions and accepts from_angle."""
+    gpio = MockGPIOBackend()
+    tester = ServoTester(gpio=gpio, force_mock=True)
+
+    # 1. Move from explicit starting angle 0 to 30 smoothly
+    res = tester.set_motor_angle("elbow", 30.0, in_degrees=True, smooth=True, speed_deg_per_s=300.0, from_angle=0.0)
+    assert res["angle_deg"] == 30.0
+    assert abs(res["pulse_us"] - 1833.3) < 2.0
+    assert abs(gpio.pwm_states[PIN_SERVO_ELBOW]["duty"] - 9.16) < 0.1
+
+    # 2. Smooth move back to 0 using tracked current position
+    res_back = tester.set_motor_angle("elbow", 0.0, in_degrees=True, smooth=True, speed_deg_per_s=300.0)
+    assert res_back["angle_deg"] == 0.0
+    assert abs(res_back["pulse_us"] - 1500.0) < 1.0
+
+
+def test_persisted_state_roundtrip(tmp_path, monkeypatch):
+    """Verify state file maintains motor positions across independent process/tester instances."""
+    state_file = str(tmp_path / "servo_state.json")
+    monkeypatch.setattr("manipulator3.servo_tester.STATE_FILE_PATH", state_file)
+
+    gpio1 = MockGPIOBackend()
+    tester1 = ServoTester(gpio=gpio1, force_mock=True)
+    tester1.set_motor_angle("wrist_pitch", 45.0, in_degrees=True)
+
+    # New tester instance simulating subsequent CLI call
+    gpio2 = MockGPIOBackend()
+    tester2 = ServoTester(gpio=gpio2, force_mock=True)
+    assert abs(tester2.current_angles_rad["wrist_pitch"] - math.radians(45.0)) < 1e-4
+
+    # Smooth transition from remembered 45° to -15°
+    res = tester2.set_motor_angle("wrist_pitch", -15.0, in_degrees=True, smooth=True, speed_deg_per_s=500.0)
+    assert res["angle_deg"] == -15.0
+

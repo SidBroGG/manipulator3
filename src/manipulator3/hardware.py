@@ -13,8 +13,30 @@ def _load_optional_module(name: str) -> Optional[Any]:
         return None
 
 
-cv2 = _load_optional_module("cv2")
-np = _load_optional_module("numpy")
+_cv2: Optional[Any] = None
+_np: Optional[Any] = None
+
+
+def _get_cv2() -> Optional[Any]:
+    global _cv2
+    if _cv2 is None:
+        _cv2 = _load_optional_module("cv2")
+    return _cv2
+
+
+def _get_np() -> Optional[Any]:
+    global _np
+    if _np is None:
+        _np = _load_optional_module("numpy")
+    return _np
+
+
+def __getattr__(name: str) -> Any:
+    if name == "cv2":
+        return _get_cv2()
+    if name == "np":
+        return _get_np()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 logger = logging.getLogger(__name__)
 
@@ -774,28 +796,34 @@ class CameraStreamerOV5647:
                     self.picam2 = None
 
             if self.picam2 is None:
-                try:
-                    self.cap = cv2.VideoCapture(0)
-                    self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-                    self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-                    if not self.cap.isOpened():
+                cv2_mod = _get_cv2()
+                if cv2_mod is not None:
+                    try:
+                        self.cap = cv2_mod.VideoCapture(0)
+                        self.cap.set(cv2_mod.CAP_PROP_FRAME_WIDTH, self.width)
+                        self.cap.set(cv2_mod.CAP_PROP_FRAME_HEIGHT, self.height)
+                        if not self.cap.isOpened():
+                            self.mock = True
+                    except Exception:
                         self.mock = True
-                except Exception:
+                else:
                     self.mock = True
 
     def capture_frame(self) -> Any:
         """Capture BGR frame as numpy ndarray."""
-        if np is None:
+        np_mod = _get_np()
+        cv2_mod = _get_cv2()
+        if np_mod is None:
             return None
 
         if self.mock:
-            frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-            if cv2 is not None:
-                cv2.putText(
+            frame = np_mod.zeros((self.height, self.width, 3), dtype=np_mod.uint8)
+            if cv2_mod is not None:
+                cv2_mod.putText(
                     frame,
                     "OV5647 CSI STREAM (MOCK)",
                     (20, self.height // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX,
+                    cv2_mod.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (0, 255, 0),
                     2,
@@ -805,7 +833,7 @@ class CameraStreamerOV5647:
         if self.picam2 is not None:
             try:
                 rgb = self.picam2.capture_array()
-                return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR) if cv2 is not None else rgb
+                return cv2_mod.cvtColor(rgb, cv2_mod.COLOR_RGB2BGR) if cv2_mod is not None else rgb
             except Exception:
                 pass
 
@@ -813,14 +841,14 @@ class CameraStreamerOV5647:
             try:
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
-                    if cv2 is not None and (frame.shape[1] != self.width or frame.shape[0] != self.height):
-                        frame = cv2.resize(frame, (self.width, self.height))
+                    if cv2_mod is not None and (frame.shape[1] != self.width or frame.shape[0] != self.height):
+                        frame = cv2_mod.resize(frame, (self.width, self.height))
                     return frame
             except Exception:
                 pass
 
         # Fallback to black frame
-        return np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        return np_mod.zeros((self.height, self.width, 3), dtype=np_mod.uint8)
 
     def close(self) -> None:
         if self.picam2 is not None:

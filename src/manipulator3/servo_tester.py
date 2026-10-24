@@ -1,6 +1,8 @@
 import argparse
+import json
 import logging
 import math
+import os
 import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -22,6 +24,7 @@ from manipulator3.hardware import (
 )
 
 logger = logging.getLogger("servo_tester")
+STATE_FILE_PATH = os.environ.get("MANIPULATOR_STATE_FILE", "/tmp/manipulator3_servo_state.json")
 
 
 class ServoTester:
@@ -182,6 +185,28 @@ class ServoTester:
             "gripper": 0.0,
             "base": 0.0,
         }
+        self._load_persisted_state()
+
+    def _load_persisted_state(self) -> None:
+        """Load last commanded angles from local disk state cache."""
+        try:
+            if os.path.exists(STATE_FILE_PATH):
+                with open(STATE_FILE_PATH, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            if k in self.current_angles_rad and isinstance(v, (int, float)):
+                                self.current_angles_rad[k] = float(v)
+        except Exception:
+            pass
+
+    def _save_persisted_state(self) -> None:
+        """Persist current angles to disk for smooth multi-command continuity."""
+        try:
+            with open(STATE_FILE_PATH, "w", encoding="utf-8") as f:
+                json.dump(self.current_angles_rad, f)
+        except Exception:
+            pass
 
     def resolve_motor(self, identifier: Union[int, str]) -> str:
         """Resolve motor name or index alias to canonical key."""
@@ -199,8 +224,9 @@ class ServoTester:
         in_degrees: bool = True,
         smooth: bool = False,
         speed_deg_per_s: float = 60.0,
+        from_angle: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Set target angle for a single motor or coupled shoulder."""
+        """Set target angle for a single motor or coupled shoulder with optional smooth interpolation."""
         key = self.resolve_motor(motor)
         mdef = self.MOTOR_DEFINITIONS[key]
 
@@ -213,20 +239,30 @@ class ServoTester:
             target_deg = math.degrees(target_rad)
             clamped = True
 
-        current_rad = self.current_angles_rad.get(key, 0.0)
+        if from_angle is not None:
+            current_rad = math.radians(from_angle) if in_degrees else float(from_angle)
+            current_deg = math.degrees(current_rad)
+            self.current_angles_rad[key] = current_rad
+        else:
+            current_rad = self.current_angles_rad.get(key, 0.0)
+            current_deg = math.degrees(current_rad)
 
-        if smooth and abs(target_rad - current_rad) > 1e-3:
-            step_rate_hz = 30.0
-            total_deg = abs(target_deg - math.degrees(current_rad))
-            duration = max(0.05, total_deg / max(1.0, speed_deg_per_s))
-            num_steps = max(2, int(duration * step_rate_hz))
+        diff_deg = abs(target_deg - current_deg)
+
+        if smooth and diff_deg > 0.2:
+            step_rate_hz = 50.0  # 50 Hz PWM frame rate
+            duration = max(0.04, diff_deg / max(1.0, speed_deg_per_s))
+            num_steps = max(2, int(round(duration * step_rate_hz)))
+            step_dt = duration / num_steps
             for i in range(1, num_steps + 1):
-                interp_rad = current_rad + (target_rad - current_rad) * (i / num_steps)
+                alpha = i / num_steps
+                interp_rad = current_rad + (target_rad - current_rad) * alpha
                 self._apply_angle(key, interp_rad)
-                time.sleep(duration / num_steps)
+                time.sleep(step_dt)
         else:
             self._apply_angle(key, target_rad)
 
+        self._save_persisted_state()
         return self.get_motor_status(key, clamped=clamped)
 
     def _apply_angle(self, key: str, angle_rad: float) -> None:
@@ -284,10 +320,12 @@ class ServoTester:
             "type": mdef["type"],
         }
 
-    def center_all(self, smooth: bool = False) -> None:
+    def center_all(self, smooth: bool = False, speed_deg_per_s: float = 60.0) -> None:
         """Reset all motors to center position (0 deg / 1500 us)."""
-        for key in ["shoulder", "elbow", "wrist_pitch", "wrist_roll", "gripper", "base"]:
-            self.set_motor_angle(key, 0.0, in_degrees=True, smooth=smooth)
+        sequence = ["gripper", "wrist_roll", "wrist_pitch", "elbow", "shoulder", "base"]
+        for key in sequence:
+            self.set_motor_angle(key, 0.0, in_degrees=True, smooth=smooth, speed_deg_per_s=speed_deg_per_s)
+        self._save_persisted_state()
 
     def relax(self, motor: Optional[Union[int, str]] = None) -> None:
         """Cut off PWM duty cycle to relax servo holding torque."""
@@ -296,6 +334,7 @@ class ServoTester:
         else:
             key = self.resolve_motor(motor)
             self.servos.relax_servo(key)
+        self._save_persisted_state()
 
     def sweep(
         self,
@@ -332,19 +371,25 @@ class ServoTester:
             )
         print("+-----+------------------------------+-------+----------+-------------+--------------+")
 
-    def run_interactive(self) -> None:
+    def run_interactive(self, default_smooth: bool = False, default_speed: float = 60.0) -> None:
         """Interactive console interface for manual calibration and testing."""
+        smooth_mode = default_smooth
+        smooth_speed = default_speed
         print("\n==================================================================")
         print("   Raspberry Pi Zero W Manipulator - Servo Testing Console       ")
         print("==================================================================")
         self.print_status_table()
+        mode_str = "ENABLED" if smooth_mode else "DISABLED"
+        print(f"[INFO] Smooth mode: {mode_str} (speed: {smooth_speed:.1f} deg/s)")
         print("\nCommands:")
-        print("  <motor> <angle>   : Set motor to angle in degrees (e.g. '3 45', 'elbow -20')")
-        print("  center            : Set all motors to center 0°")
-        print("  relax [motor]     : Cut PWM power to relax motor (or all if omitted)")
-        print("  sweep <motor>     : Smoothly sweep motor between min and max limits")
-        print("  status            : Print current status table")
-        print("  quit / exit / q   : Safely exit and cleanup GPIO\n")
+        print("  <motor> <angle>         : Set motor angle in degrees (e.g. '3 45', 'elbow -20')")
+        print("  <motor> <angle> [s|f]   : Move smoothly [s] or fast [f]")
+        print("  smooth [on|off|<speed>] : Toggle smooth mode or set speed (e.g. 'smooth 45')")
+        print("  center [smooth|fast]    : Set all motors to center 0°")
+        print("  relax [motor]           : Cut PWM power to relax motor (or all if omitted)")
+        print("  sweep <motor>           : Smoothly sweep motor between min and max limits")
+        print("  status                  : Print current status table")
+        print("  quit / exit / q         : Safely exit and cleanup GPIO\n")
 
         while True:
             try:
@@ -360,9 +405,31 @@ class ServoTester:
                     break
                 elif cmd == "status":
                     self.print_status_table()
+                elif cmd == "smooth":
+                    if len(parts) == 1:
+                        smooth_mode = not smooth_mode
+                    elif parts[1].lower() in ("on", "1", "true"):
+                        smooth_mode = True
+                    elif parts[1].lower() in ("off", "0", "false"):
+                        smooth_mode = False
+                    else:
+                        try:
+                            smooth_speed = float(parts[1])
+                            smooth_mode = True
+                        except ValueError:
+                            pass
+                    st_str = "ENABLED" if smooth_mode else "DISABLED"
+                    print(f"[INFO] Smooth mode: {st_str} ({smooth_speed:.1f} deg/s)")
                 elif cmd == "center":
-                    self.center_all(smooth=True)
-                    print("[INFO] All motors centered to 0°.")
+                    use_smooth = smooth_mode
+                    if len(parts) > 1:
+                        if parts[1].lower() in ("smooth", "s", "-s"):
+                            use_smooth = True
+                        elif parts[1].lower() in ("fast", "f", "-f"):
+                            use_smooth = False
+                    self.center_all(smooth=use_smooth, speed_deg_per_s=smooth_speed)
+                    mode_txt = "smoothly " if use_smooth else ""
+                    print(f"[INFO] All motors {mode_txt}centered to 0°.")
                 elif cmd == "relax":
                     motor = parts[1] if len(parts) > 1 else None
                     self.relax(motor)
@@ -373,10 +440,10 @@ class ServoTester:
                         print("[ERROR] Please specify motor to sweep (e.g. 'sweep 3' or 'sweep elbow').")
                         continue
                     print(f"[INFO] Sweeping motor {parts[1]}...")
-                    self.sweep(parts[1])
+                    self.sweep(parts[1], speed_deg_per_s=smooth_speed)
                     print("[INFO] Sweep complete.")
                 else:
-                    # Treat as <motor> [<angle>]
+                    use_smooth = smooth_mode
                     if len(parts) == 1:
                         motor_input = parts[0]
                         resolved = self.resolve_motor(motor_input)
@@ -386,12 +453,19 @@ class ServoTester:
                     else:
                         motor_input = parts[0]
                         angle_val = float(parts[1])
+                        if len(parts) >= 3:
+                            flag = parts[2].lower()
+                            if flag in ("smooth", "s", "-s"):
+                                use_smooth = True
+                            elif flag in ("fast", "f", "-f"):
+                                use_smooth = False
 
-                    res = self.set_motor_angle(motor_input, angle_val, in_degrees=True, smooth=False)
+                    res = self.set_motor_angle(motor_input, angle_val, in_degrees=True, smooth=use_smooth, speed_deg_per_s=smooth_speed)
                     pulse_info = f" | Pulse: {res['pulse_us']} µs ({res['duty_pct']}%)" if res["type"] != "stepper" else ""
                     clamped_info = " [CLAMPED]" if res["clamped"] else ""
+                    smooth_tag = " (smooth)" if use_smooth else ""
                     print(
-                        f"[INFO] Motor '{res['key']}' (GPIO {res['pin']}) -> {res['angle_deg']}° ({res['angle_rad']} rad){pulse_info}{clamped_info}"
+                        f"[INFO] Motor '{res['key']}' (GPIO {res['pin']}) -> {res['angle_deg']}° ({res['angle_rad']} rad){pulse_info}{clamped_info}{smooth_tag}"
                     )
             except (ValueError, KeyError) as e:
                 print(f"[WARNING] Invalid input: {e}")
@@ -405,14 +479,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Raspberry Pi Zero W Servo Testing Utility")
     parser.add_argument("-m", "--motor", type=str, help="Motor ID (0-6) or name (e.g. elbow, shoulder, gripper)")
     parser.add_argument("-a", "--angle", type=float, help="Target angle (degrees by default)")
+    parser.add_argument(
+        "-f",
+        "--from-angle",
+        type=float,
+        default=None,
+        help="Explicit starting angle in degrees for smooth interpolation (default: last tracked position)",
+    )
     parser.add_argument("--rad", action="store_true", help="Interpret angle in radians instead of degrees")
     parser.add_argument("--smooth", action="store_true", help="Interpolate movement gradually")
     parser.add_argument("--speed", type=float, default=60.0, help="Smooth movement speed (deg/s)")
     parser.add_argument(
         "--hold",
         type=float,
-        default=2.5,
-        help="Seconds to hold PWM signal active to let servo reach position (default: 2.5s; 0=exit immediately; -1=hold indefinitely until Ctrl+C)",
+        default=None,
+        help="Seconds to hold PWM signal active (default: 0.2s for smooth, 0.5s for instant; 0=exit immediately; -1=indefinitely)",
     )
     parser.add_argument("--center", action="store_true", help="Center all motors to 0°")
     parser.add_argument("--relax", action="store_true", help="Relax holding torque on all servos")
@@ -426,6 +507,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="BCM GPIO pin for Shoulder B (default: PIN_SERVO_SHOULDER_B env or 19 / Pin 35)",
     )
     parser.add_argument("-i", "--interactive", action="store_true", help="Launch interactive testing console")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show informational debug logs")
     return parser
 
 
@@ -433,6 +515,7 @@ def main() -> int:
     parser = build_arg_parser()
     args = parser.parse_args()
 
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(message)s")
     tester = ServoTester(force_mock=args.mock)
 
     if args.pin_shoulder_b is not None:
@@ -450,12 +533,14 @@ def main() -> int:
         return 0
 
     if args.center:
-        tester.center_all(smooth=args.smooth)
+        tester.center_all(smooth=args.smooth, speed_deg_per_s=args.speed)
         print("[INFO] All motors centered to 0°.")
-        if args.hold > 0:
-            print(f"[INFO] Holding center position for {args.hold:.1f}s...")
+        hold_time = args.hold if args.hold is not None else (0.2 if args.smooth else 0.5)
+        if hold_time > 0:
+            if hold_time > 0.3:
+                print(f"[INFO] Holding center position for {hold_time:.1f}s...")
             try:
-                time.sleep(args.hold)
+                time.sleep(hold_time)
             except KeyboardInterrupt:
                 pass
         return 0
@@ -474,32 +559,39 @@ def main() -> int:
             in_degrees=in_degrees,
             smooth=args.smooth,
             speed_deg_per_s=args.speed,
+            from_angle=args.from_angle,
         )
         pulse_info = f" | Pulse: {res['pulse_us']} µs ({res['duty_pct']}%)" if res["type"] != "stepper" else ""
         clamped_info = " [CLAMPED TO LIMITS]" if res["clamped"] else ""
+        smooth_tag = " (smooth)" if args.smooth else ""
         print(
-            f"[INFO] Motor '{res['key']}' (GPIO {res['pin']}) -> {res['angle_deg']}° ({res['angle_rad']} rad){pulse_info}{clamped_info}"
+            f"[INFO] Motor '{res['key']}' (GPIO {res['pin']}) -> {res['angle_deg']}° ({res['angle_rad']} rad){pulse_info}{clamped_info}{smooth_tag}"
         )
 
-        # Hold PWM signal so the servo has time to physically travel to target position
-        if args.hold != 0 and res["type"] != "stepper":
-            if args.hold < 0:
+        hold_time = args.hold if args.hold is not None else (0.2 if args.smooth else 0.5)
+        if hold_time != 0 and res["type"] != "stepper":
+            if hold_time < 0:
                 print("[INFO] Holding position indefinitely. Press Ctrl+C to stop.")
                 try:
                     while True:
                         time.sleep(1.0)
                 except KeyboardInterrupt:
                     print("\n[INFO] Stopped holding.")
-            else:
-                print(f"[INFO] Holding PWM signal for {args.hold:.1f}s to allow servo to reach position...")
+            elif hold_time > 0.3:
+                print(f"[INFO] Holding PWM signal for {hold_time:.1f}s to allow servo to reach position...")
                 try:
-                    time.sleep(args.hold)
+                    time.sleep(hold_time)
+                except KeyboardInterrupt:
+                    pass
+            elif hold_time > 0:
+                try:
+                    time.sleep(hold_time)
                 except KeyboardInterrupt:
                     pass
         return 0
 
     # Default to interactive console
-    tester.run_interactive()
+    tester.run_interactive(default_smooth=args.smooth, default_speed=args.speed)
     return 0
 
 
