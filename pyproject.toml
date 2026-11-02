@@ -6,10 +6,11 @@ readme = "README.md"
 authors = [
     { name = "asus_windows", email = "sasha.sidenko09@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "adafruit-circuitpython-vl53l0x>=3.6.19",
     "eclipse-zenoh>=1.10.1",
+    "pigpio>=1.78",
     "smbus2>=0.6.1",
 ]
 
@@ -20,7 +21,7 @@ host = [
     "mujoco>=3.16.0",
     "numpy>=1.24.0",
     "opencv-python>=4.6.0",
-    "scipy>=1.18.1",
+    "scipy>=1.10.0",
     "ultralytics>=8.4.177",
 ]
 dev = [
@@ -32,7 +33,7 @@ full = [
     "mujoco>=3.16.0",
     "numpy>=1.24.0",
     "opencv-python>=4.6.0",
-    "scipy>=1.18.1",
+    "scipy>=1.10.0",
     "ultralytics>=8.4.177",
     "pytest>=9.1.1",
 ]
@@ -43,5 +44,5 @@ manipulator3-client = "manipulator3.thin_client:main"
 manipulator3-servo-test = "manipulator3.servo_tester:main"
 
 [build-system]
-requires = ["uv_build>=0.12.20,<0.13.0"]
+requires = ["uv_build>=0.12.20,<0.15.0"]
 build-backend = "uv_build"
