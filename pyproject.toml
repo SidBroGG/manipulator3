@@ -8,13 +8,15 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "adafruit-circuitpython-vl53l0x>=3.6.19",
     "eclipse-zenoh>=1.10.1",
     "pigpio>=1.78",
     "smbus2>=0.6.1",
 ]
 
 [project.optional-dependencies]
+tof = [
+    "adafruit-circuitpython-vl53l0x>=3.6.19",
+]
 host = [
     "ikpy>=4.1.0",
     "mediapipe>=1.1.1",
@@ -28,6 +30,7 @@ dev = [
     "pytest>=9.1.1",
 ]
 full = [
+    "adafruit-circuitpython-vl53l0x>=3.6.19",
     "ikpy>=4.1.0",
     "mediapipe>=1.1.1",
     "mujoco>=3.16.0",

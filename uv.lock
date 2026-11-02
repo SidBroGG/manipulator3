@@ -1314,7 +1314,6 @@ name = "manipulator3"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "adafruit-circuitpython-vl53l0x" },
     { name = "eclipse-zenoh" },
     { name = "pigpio" },
     { name = "smbus2" },
@@ -1325,6 +1324,7 @@ dev = [
     { name = "pytest" },
 ]
 full = [
+    { name = "adafruit-circuitpython-vl53l0x" },
     { name = "ikpy" },
     { name = "mediapipe" },
     { name = "mujoco" },
@@ -1355,10 +1355,14 @@ host = [
     { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "ultralytics" },
 ]
+tof = [
+    { name = "adafruit-circuitpython-vl53l0x" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "adafruit-circuitpython-vl53l0x", specifier = ">=3.6.19" },
+    { name = "adafruit-circuitpython-vl53l0x", marker = "extra == 'full'", specifier = ">=3.6.19" },
+    { name = "adafruit-circuitpython-vl53l0x", marker = "extra == 'tof'", specifier = ">=3.6.19" },
     { name = "eclipse-zenoh", specifier = ">=1.10.1" },
     { name = "ikpy", marker = "extra == 'full'", specifier = ">=4.1.0" },
     { name = "ikpy", marker = "extra == 'host'", specifier = ">=4.1.0" },
@@ -1379,7 +1383,7 @@ requires-dist = [
     { name = "ultralytics", marker = "extra == 'full'", specifier = ">=8.4.177" },
     { name = "ultralytics", marker = "extra == 'host'", specifier = ">=8.4.177" },
 ]
-provides-extras = ["host", "dev", "full"]
+provides-extras = ["tof", "host", "dev", "full"]
 
 [[package]]
 name = "markupsafe"

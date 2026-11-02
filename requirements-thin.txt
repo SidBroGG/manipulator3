@@ -1,7 +1,7 @@
 # Thin Client lightweight dependencies for Raspberry Pi Zero W / Zero 2 W
 # System packages: sudo apt install -y python3-numpy python3-opencv
+# For physical VL53L0X ToF sensor: sudo apt install -y python3-dev && pip install adafruit-circuitpython-vl53l0x
 eclipse-zenoh>=1.10.1
-smbus2>=0.6.1
-adafruit-circuitpython-vl53l0x>=3.6.19
 pigpio>=1.78
+smbus2>=0.6.1
 
