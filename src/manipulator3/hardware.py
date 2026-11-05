@@ -256,8 +256,24 @@ class LGPIOBackend(GPIOBackend):
         except Exception:
             pass
 
+    def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
+        """Hardware/software timed servo pulse via lgpio tx_servo with fallback to tx_pwm."""
+        if pin not in self.active_pins:
+            self.setup_output(pin)
+        try:
+            if hasattr(self.lgpio, "tx_servo"):
+                pulse_int = int(round(pulse_us)) if pulse_us > 0.0 else 0
+                self.lgpio.tx_servo(self.handle, pin, pulse_int, int(DEFAULT_PWM_FREQ_HZ))
+            else:
+                duty = (pulse_us / (1_000_000.0 / DEFAULT_PWM_FREQ_HZ)) * 100.0
+                self.set_pwm_duty(pin, duty)
+        except Exception as e:
+            logger.warning(f"[WARNING] LGPIO set_servo_pulse failed on pin {pin}: {e}")
+
     def stop_pwm(self, pin: int) -> None:
         try:
+            if hasattr(self.lgpio, "tx_servo"):
+                self.lgpio.tx_servo(self.handle, pin, 0, int(DEFAULT_PWM_FREQ_HZ))
             self.lgpio.tx_pwm(self.handle, pin, 0, 0)
         except Exception:
             pass
@@ -347,17 +363,25 @@ def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
         return MockGPIOBackend()
 
     # 1. pigpio: DMA-based hardware PWM (zero jitter on Pi Zero / 1 / 2 / 3 / 4)
+    pigpio_err: Optional[Exception] = None
     try:
         backend = PiGPIOBackend()
         logger.info("[INFO] Connected to pigpio daemon (DMA hardware PWM, zero jitter).")
         return backend
-    except Exception:
-        pass
+    except Exception as e:
+        pigpio_err = e
 
     # 2. lgpio: Kernel gpiochip PWM (Raspberry Pi OS Bookworm)
     try:
         backend = LGPIOBackend()
-        logger.info("[INFO] Using LGPIOBackend.")
+        if pigpio_err is not None:
+            logger.warning(
+                f"[WARNING] pigpiod daemon is not running ({pigpio_err})!\n"
+                f"          Using LGPIOBackend with software timing — SERVOS WILL JITTER / TWITCH!\n"
+                f"          To fix jitter, start the daemon: 'sudo pigpiod' or 'sudo systemctl start pigpiod'."
+            )
+        else:
+            logger.info("[INFO] Using LGPIOBackend.")
         return backend
     except Exception:
         pass
@@ -365,12 +389,15 @@ def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
     # 3. RPi.GPIO: Legacy software PWM
     try:
         backend = RPiGPIOBackend()
-        logger.info("[INFO] Using RPiGPIOBackend.")
+        logger.warning(
+            "[WARNING] Using legacy RPi.GPIO software PWM — SERVOS WILL JITTER / TWITCH!\n"
+            "          To fix jitter, start the daemon: 'sudo pigpiod' or 'sudo systemctl start pigpiod'."
+        )
         return backend
     except Exception:
         pass
 
-    logger.info("[INFO] RPi GPIO libraries not detected. Using MockGPIOBackend.")
+    logger.warning("[WARNING] RPi GPIO libraries not detected. Falling back to MockGPIOBackend (NO PHYSICAL MOTOR MOTION).")
     return MockGPIOBackend()
 
 

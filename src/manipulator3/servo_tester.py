@@ -518,6 +518,14 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(message)s")
     tester = ServoTester(force_mock=args.mock)
 
+    backend_type = type(tester.gpio).__name__
+    if backend_type == "PiGPIOBackend":
+        print("[INFO] Active GPIO Backend: PiGPIOBackend (DMA Hardware PWM - Zero Jitter)")
+    elif backend_type == "MockGPIOBackend":
+        print("[WARNING] Active GPIO Backend: MockGPIOBackend (VIRTUAL - Hardware pins NOT commanded!)")
+    else:
+        print(f"[WARNING] Active GPIO Backend: {backend_type} (Software PWM - Servos will jitter! Run 'sudo pigpiod')")
+
     if args.pin_shoulder_b is not None:
         tester.servos.configs["shoulder_b"].pin = args.pin_shoulder_b
         tester.MOTOR_DEFINITIONS["shoulder_b"]["pin"] = args.pin_shoulder_b
