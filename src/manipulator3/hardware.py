@@ -4,6 +4,7 @@ import logging
 import math
 import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -137,7 +138,10 @@ class MockGPIOBackend(GPIOBackend):
 
 
 def ensure_pigpiod_running() -> bool:
-    """Ensure pigpiod daemon is running with hardware timing."""
+    """Ensure pigpiod daemon is running with hardware timing (Linux only)."""
+    if sys.platform != "linux":
+        return False
+
     # 1. Check if daemon is already responding
     try:
         res = subprocess.run(["pgrep", "pigpiod"], capture_output=True, timeout=1.0)
@@ -146,15 +150,27 @@ def ensure_pigpiod_running() -> bool:
     except Exception:
         pass
 
-    # 2. Try launching pigpiod via systemctl or direct command
+    # 2. Check if pigpiod binary exists; if not, try installing via apt
+    try:
+        which_res = subprocess.run(["which", "pigpiod"], capture_output=True, timeout=1.0)
+        if which_res.returncode != 0:
+            logger.info("[INFO] pigpiod binary not found. Attempting apt install...")
+            subprocess.run(["sudo", "apt-get", "update", "-y"], capture_output=True, stdin=subprocess.DEVNULL, timeout=10.0)
+            subprocess.run(["sudo", "apt-get", "install", "-y", "pigpio"], capture_output=True, stdin=subprocess.DEVNULL, timeout=20.0)
+    except Exception:
+        pass
+
+    # 3. Try launching pigpiod via systemctl or direct command
     for cmd in [
         ["sudo", "systemctl", "start", "pigpiod"],
+        ["sudo", "systemctl", "enable", "--now", "pigpiod"],
         ["sudo", "pigpiod", "-s", "2"],
+        ["sudo", "pigpiod"],
         ["sudo", "pigpiod", "-t", "0", "-s", "2"],
         ["pigpiod", "-s", "2"],
     ]:
         try:
-            subprocess.run(cmd, capture_output=True, timeout=2.0)
+            subprocess.run(cmd, capture_output=True, stdin=subprocess.DEVNULL, timeout=2.0)
             time.sleep(0.3)
             res = subprocess.run(["pgrep", "pigpiod"], capture_output=True, timeout=1.0)
             if res.returncode == 0:
@@ -168,6 +184,8 @@ def ensure_pigpiod_running() -> bool:
 
 def set_rpi_cpu_performance_mode() -> bool:
     """Lock CPU frequency to performance governor to eliminate clock frequency scaling jitter."""
+    if sys.platform != "linux":
+        return False
     success = False
     governors = glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor")
     for gov in governors:
@@ -177,7 +195,7 @@ def set_rpi_cpu_performance_mode() -> bool:
             success = True
         except Exception:
             try:
-                subprocess.run(f"echo performance | sudo tee {gov}", shell=True, capture_output=True, timeout=1.0)
+                subprocess.run(f"echo performance | sudo tee {gov}", shell=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=1.0)
                 success = True
             except Exception:
                 pass
@@ -336,13 +354,16 @@ class PiGPIOBackend(GPIOBackend):
     def __init__(self, host: str = "localhost", port: int = 8888) -> None:
         self.pigpio = _load_optional_module("pigpio")
         if self.pigpio is None:
-            raise ImportError("pigpio module is not installed")
+            raise ImportError(
+                "pigpio Python module is not installed! Run: 'pip install pigpio' or 'sudo apt-get install -y python3-pigpio'"
+            )
+        ensure_pigpiod_running()
         self.pi = self.pigpio.pi(host, port)
         if not self.pi.connected:
-            if ensure_pigpiod_running():
-                self.pi = self.pigpio.pi(host, port)
+            ensure_pigpiod_running()
+            self.pi = self.pigpio.pi(host, port)
         if not self.pi.connected:
-            raise ConnectionError("pigpiod daemon is not running. Run: sudo systemctl start pigpiod")
+            raise ConnectionError("pigpiod daemon is not running. Run: sudo systemctl enable --now pigpiod")
         self.active_pins: List[int] = []
         self._warned_pins: set = set()
         self._current_pulses: Dict[int, int] = {}
@@ -615,9 +636,11 @@ def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
         backend = LGPIOBackend()
         if pigpio_err is not None:
             logger.warning(
-                f"[WARNING] pigpiod daemon is not running ({pigpio_err})!\n"
-                f"          Using LGPIOBackend with pulse deduplication.\n"
-                f"          To enable DMA hardware timing, start: 'sudo pigpiod -t 0 -s 2'."
+                f"[WARNING] pigpiod hardware DMA daemon is not active ({pigpio_err})!\n"
+                f"          Using LGPIOBackend (Software-timed PWM - susceptible to Linux kernel jitter).\n"
+                f"          To enable rock-solid 0% jitter DMA timing on Raspberry Pi, run:\n"
+                f"              sudo apt-get install -y pigpio python3-pigpio\n"
+                f"              sudo systemctl enable --now pigpiod"
             )
         else:
             logger.info("[INFO] Using LGPIOBackend with pulse deduplication.")

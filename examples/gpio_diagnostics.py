@@ -94,9 +94,12 @@ class DirectGPIOController:
         try:
             import pigpio
             pi = pigpio.pi()
+            if not pi.connected:
+                ensure_pigpiod_running()
+                pi = pigpio.pi()
             if pi.connected:
                 self._pigpio_pi = pi
-                self.backend_name = "pigpio (DMA hardware PWM)"
+                self.backend_name = "pigpio (DMA hardware PWM - ZERO JITTER)"
                 try:
                     self._pigpio_pi.set_pad_strength(0, 16)
                 except Exception:
