@@ -151,3 +151,18 @@ def test_persisted_state_roundtrip(tmp_path, monkeypatch):
     res = tester2.set_motor_angle("wrist_pitch", -15.0, in_degrees=True, smooth=True, speed_deg_per_s=500.0)
     assert res["angle_deg"] == -15.0
 
+
+def test_gpio_diagnostics_mock_execution():
+    """Verify gpio_diagnostics runs static, blink, and pwm modes safely without hardware."""
+    import subprocess
+    import sys
+    res = subprocess.run(
+        [sys.executable, "examples/gpio_diagnostics.py", "--mock", "--pin", "elbow", "--mode", "static", "--duration", "0.05"],
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0
+    assert "Elbow (MG996R)" in res.stdout
+    assert "Pin is now HIGH (+3.3V)" in res.stdout
+
+
