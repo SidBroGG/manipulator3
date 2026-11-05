@@ -271,9 +271,38 @@ def test_pca9685_backend_register_programming(monkeypatch):
     backend = PCA9685Backend(bus_id=1, address=0x40, freq_hz=50.0)
     # Check 50Hz prescale write: round(25e6 / (4096 * 50)) - 1 = 121
     mock_bus.write_byte_data.assert_any_call(0x40, 0xFE, 121)
+    # Check MODE2 totem-pole output driver write (0x04)
+    mock_bus.write_byte_data.assert_any_call(0x40, 0x01, 0x04)
 
     # Test 1500 us pulse on channel 0 (Shoulder A / BCM 26)
     # 1500 us in 20000 us period -> (1500 / 20000) * 4095 = 307.125 -> 307 (0x0133)
     backend.set_servo_pulse(26, 1500.0)
     mock_bus.write_i2c_block_data.assert_called_with(0x40, 0x06, [0, 0, 0x33, 0x01])
+
+    # Test channel 1 (Shoulder B / BCM 19) staggered by 256 ticks
+    # on_tick = 256 (0x0100), off_tick = (256 + 307) = 563 (0x0233)
+    backend.set_servo_pulse(19, 1500.0)
+    mock_bus.write_i2c_block_data.assert_called_with(0x40, 0x0A, [0x00, 0x01, 0x33, 0x02])
+
+
+def test_pigpio_pad_strength_and_pull_off(monkeypatch):
+    """Verify PiGPIOBackend boosts pad drive strength to 16mA and disables pull resistors."""
+    from unittest.mock import MagicMock
+    from manipulator3.hardware import PiGPIOBackend
+
+    mock_pi = MagicMock()
+    mock_pi.connected = True
+    mock_pigpio_mod = MagicMock()
+    mock_pigpio_mod.pi.return_value = mock_pi
+    mock_pigpio_mod.OUTPUT = 1
+    mock_pigpio_mod.PUD_OFF = 0
+
+    monkeypatch.setattr("manipulator3.hardware._load_optional_module", lambda name: mock_pigpio_mod if name == "pigpio" else None)
+
+    backend = PiGPIOBackend()
+    mock_pi.set_pad_strength.assert_called_with(0, 16)
+
+    backend.setup_output(26)
+    mock_pi.set_pull_up_down.assert_called_with(26, 0)
+
 

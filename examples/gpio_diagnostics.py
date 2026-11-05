@@ -97,6 +97,10 @@ class DirectGPIOController:
             if pi.connected:
                 self._pigpio_pi = pi
                 self.backend_name = "pigpio (DMA hardware PWM)"
+                try:
+                    self._pigpio_pi.set_pad_strength(0, 16)
+                except Exception:
+                    pass
                 return
         except Exception:
             pass
@@ -127,6 +131,10 @@ class DirectGPIOController:
     def setup_output(self, bcm_pin: int) -> None:
         if self._pigpio_pi:
             self._pigpio_pi.set_mode(bcm_pin, self._pigpio_pi.OUTPUT)
+            try:
+                self._pigpio_pi.set_pull_up_down(bcm_pin, self._pigpio_pi.PUD_OFF)
+            except Exception:
+                pass
         elif self._lgpio_handle is not None and self._lgpio_mod is not None:
             self._lgpio_mod.gpio_claim_output(self._lgpio_handle, bcm_pin)
         elif self._rpi_gpio:
@@ -171,7 +179,8 @@ class DirectGPIOController:
         elif self._lgpio_handle is not None and self._lgpio_mod is not None:
             if hasattr(self._lgpio_mod, "tx_servo"):
                 self._lgpio_mod.tx_servo(self._lgpio_handle, bcm_pin, 0, 50)
-            self._lgpio_mod.tx_pwm(self._lgpio_handle, bcm_pin, 0, 0)
+            else:
+                self._lgpio_mod.tx_pwm(self._lgpio_handle, bcm_pin, 0, 0)
 
     def cleanup(self) -> None:
         for pin in self._active_pins:

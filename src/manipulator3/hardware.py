@@ -137,7 +137,7 @@ class MockGPIOBackend(GPIOBackend):
 
 
 def ensure_pigpiod_running() -> bool:
-    """Ensure pigpiod daemon is running with PWM hardware timing (-t 0 -s 2)."""
+    """Ensure pigpiod daemon is running with hardware timing."""
     # 1. Check if daemon is already responding
     try:
         res = subprocess.run(["pgrep", "pigpiod"], capture_output=True, timeout=1.0)
@@ -149,8 +149,9 @@ def ensure_pigpiod_running() -> bool:
     # 2. Try launching pigpiod via systemctl or direct command
     for cmd in [
         ["sudo", "systemctl", "start", "pigpiod"],
+        ["sudo", "pigpiod", "-s", "2"],
         ["sudo", "pigpiod", "-t", "0", "-s", "2"],
-        ["pigpiod", "-t", "0", "-s", "2"],
+        ["pigpiod", "-s", "2"],
     ]:
         try:
             subprocess.run(cmd, capture_output=True, timeout=2.0)
@@ -253,6 +254,8 @@ class PCA9685Backend(GPIOBackend):
         # MODE1 normal mode
         self._bus.write_byte_data(self.address, 0x00, 0x00)
         time.sleep(0.005)
+        # MODE2: OUTDRV = 1 (Totem-Pole push-pull output structure for clean active 5V amplitude, not open-drain)
+        self._bus.write_byte_data(self.address, 0x01, 0x04)
         # MODE1 auto-increment enabled
         self._bus.write_byte_data(self.address, 0x00, 0xA1)
 
@@ -289,19 +292,29 @@ class PCA9685Backend(GPIOBackend):
 
         if pulse_us <= 0.0:
             off_tick = 0
+            on_tick = 0
+            pulse_ticks = 0
         else:
             period_us = 1_000_000.0 / self.freq_hz
-            off_tick = int(round((pulse_us / period_us) * 4095.0))
-            off_tick = max(0, min(4095, off_tick))
+            pulse_ticks = int(round((pulse_us / period_us) * 4095.0))
+            pulse_ticks = max(0, min(4095, pulse_ticks))
+            # Stagger channel ON tick across 4096 counts (ch * 256) to eliminate simultaneous current spikes
+            # that cause power rail voltage sagging when multiple servos switch on
+            on_tick = (ch * 256) % 4096
+            off_tick = (on_tick + pulse_ticks) % 4096
 
         if self._pca is not None:
-            self._pca.channels[ch].duty_cycle = int((off_tick / 4095.0) * 65535.0)
+            self._pca.channels[ch].duty_cycle = int((pulse_ticks / 4095.0) * 65535.0) if pulse_us > 0.0 else 0
         elif self._bus is not None:
             reg = 0x06 + 4 * ch
-            if off_tick == 0:
+            if pulse_us <= 0.0:
                 self._bus.write_i2c_block_data(self.address, reg, [0, 0, 0, 0x10])
             else:
-                self._bus.write_i2c_block_data(self.address, reg, [0, 0, off_tick & 0xFF, (off_tick >> 8) & 0x0F])
+                self._bus.write_i2c_block_data(
+                    self.address,
+                    reg,
+                    [on_tick & 0xFF, (on_tick >> 8) & 0x0F, off_tick & 0xFF, (off_tick >> 8) & 0x0F],
+                )
 
     def stop_pwm(self, pin: int) -> None:
         self.set_servo_pulse(pin, 0.0)
@@ -334,6 +347,13 @@ class PiGPIOBackend(GPIOBackend):
         self._warned_pins: set = set()
         self._current_pulses: Dict[int, int] = {}
 
+        # Boost GPIO bank 0 (pins 0-27) drive strength to maximum 16 mA
+        # Prevents signal voltage drop/sag under servo load or cable capacitance
+        try:
+            self.pi.set_pad_strength(0, 16)
+        except Exception:
+            pass
+
     def _is_valid_user_gpio(self, pin: int) -> bool:
         if not (0 <= pin <= 27):
             if pin not in self._warned_pins:
@@ -353,6 +373,10 @@ class PiGPIOBackend(GPIOBackend):
             return
         try:
             self.pi.set_mode(pin, self.pigpio.OUTPUT)
+            try:
+                self.pi.set_pull_up_down(pin, self.pigpio.PUD_OFF)
+            except Exception:
+                pass
             if pin not in self.active_pins:
                 self.active_pins.append(pin)
         except Exception as e:
@@ -471,7 +495,8 @@ class LGPIOBackend(GPIOBackend):
         try:
             if hasattr(self.lgpio, "tx_servo"):
                 self.lgpio.tx_servo(self.handle, pin, 0, int(DEFAULT_PWM_FREQ_HZ))
-            self.lgpio.tx_pwm(self.handle, pin, 0, 0)
+            else:
+                self.lgpio.tx_pwm(self.handle, pin, 0, 0)
         except Exception:
             pass
 
