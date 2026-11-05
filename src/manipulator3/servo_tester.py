@@ -13,6 +13,7 @@ from manipulator3.hardware import (
     ServoController,
     StepperDriverA4988,
     get_default_gpio_backend,
+    set_rpi_cpu_performance_mode,
     PIN_STEP,
     PIN_DIR,
     PIN_SERVO_SHOULDER_A,
@@ -171,6 +172,9 @@ class ServoTester:
         force_mock: bool = False,
         freq_hz: float = 50.0,
     ) -> None:
+        self.force_mock = force_mock
+        if not self.force_mock:
+            set_rpi_cpu_performance_mode()
         self.gpio = gpio or get_default_gpio_backend(force_mock=force_mock)
         self.servos = ServoController(self.gpio, freq_hz=freq_hz)
         self.stepper = StepperDriverA4988(self.gpio)

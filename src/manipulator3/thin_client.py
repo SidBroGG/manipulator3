@@ -10,6 +10,7 @@ from manipulator3.hardware import (
     GPIOBackend,
     MockGPIOBackend,
     get_default_gpio_backend,
+    set_rpi_cpu_performance_mode,
     StepperDriverA4988,
     ServoController,
     ToFReaderVL53L0X,
@@ -41,18 +42,23 @@ class ThinClient:
         force_mock_hardware: bool = False,
         camera_fps: int = 20,
         tof_rate_hz: float = 30.0,
+        stepper_rate_hz: float = 800.0,
         jpeg_quality: int = 75,
         watchdog_timeout_s: float = 2.0,
     ) -> None:
         self.camera_fps = camera_fps
         self.tof_rate_hz = tof_rate_hz
+        self.stepper_rate_hz = stepper_rate_hz
         self.jpeg_quality = jpeg_quality
         self.watchdog_timeout_s = watchdog_timeout_s
         self.force_mock = force_mock_hardware
 
+        if not self.force_mock:
+            set_rpi_cpu_performance_mode()
+
         # Hardware drivers
         self.gpio = gpio or get_default_gpio_backend(force_mock=self.force_mock)
-        self.stepper = StepperDriverA4988(self.gpio)
+        self.stepper = StepperDriverA4988(self.gpio, step_freq_hz=self.stepper_rate_hz)
         self.servos = ServoController(self.gpio)
         self.tof = ToFReaderVL53L0X(mock=self.force_mock)
         self.camera = CameraStreamerOV5647(fps=self.camera_fps, mock=self.force_mock)
@@ -159,17 +165,33 @@ class ThinClient:
                 time.sleep(period - dt)
 
     def _stepper_worker(self) -> None:
+        interval = 1.0 / self.stepper_rate_hz
+        next_step_time = time.perf_counter()
         while self._running:
             with self._lock:
                 is_estop = self._emergency_stop
 
             if not is_estop:
-                stepped = self.stepper.step_once()
-                if not stepped:
-                    time.sleep(0.005)
+                diff = self.stepper.target_steps - self.stepper.current_steps
+                if diff != 0:
+                    now = time.perf_counter()
+                    if now < next_step_time:
+                        rem = next_step_time - now
+                        if rem > 0.001:
+                            time.sleep(rem - 0.0005)
+                        while time.perf_counter() < next_step_time:
+                            pass
+
+                    stepped = self.stepper.step_once()
+                    if stepped:
+                        next_step_time += interval
+                    else:
+                        next_step_time = time.perf_counter()
                 else:
-                    time.sleep(0.0005)
+                    next_step_time = time.perf_counter()
+                    time.sleep(0.005)
             else:
+                next_step_time = time.perf_counter()
                 time.sleep(0.02)
 
     def _watchdog_and_state_worker(self) -> None:

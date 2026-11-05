@@ -1,6 +1,10 @@
+import glob
 import importlib
 import logging
 import math
+import os
+import subprocess
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -112,6 +116,8 @@ class MockGPIOBackend(GPIOBackend):
         if pin in self.pwm_states:
             self.pwm_states[pin]["duty"] = duty_percent
             self.pwm_states[pin]["running"] = duty_percent > 0.0
+        else:
+            self.pwm_states[pin] = {"freq": DEFAULT_PWM_FREQ_HZ, "duty": duty_percent, "running": duty_percent > 0.0}
 
     def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
         if pulse_us <= 0.0:
@@ -130,6 +136,187 @@ class MockGPIOBackend(GPIOBackend):
         self.pwm_states.clear()
 
 
+def ensure_pigpiod_running() -> bool:
+    """Ensure pigpiod daemon is running with PWM hardware timing (-t 0 -s 2)."""
+    # 1. Check if daemon is already responding
+    try:
+        res = subprocess.run(["pgrep", "pigpiod"], capture_output=True, timeout=1.0)
+        if res.returncode == 0:
+            return True
+    except Exception:
+        pass
+
+    # 2. Try launching pigpiod via systemctl or direct command
+    for cmd in [
+        ["sudo", "systemctl", "start", "pigpiod"],
+        ["sudo", "pigpiod", "-t", "0", "-s", "2"],
+        ["pigpiod", "-t", "0", "-s", "2"],
+    ]:
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=2.0)
+            time.sleep(0.3)
+            res = subprocess.run(["pgrep", "pigpiod"], capture_output=True, timeout=1.0)
+            if res.returncode == 0:
+                logger.info("[INFO] Successfully auto-started pigpiod daemon.")
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
+def set_rpi_cpu_performance_mode() -> bool:
+    """Lock CPU frequency to performance governor to eliminate clock frequency scaling jitter."""
+    success = False
+    governors = glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor")
+    for gov in governors:
+        try:
+            with open(gov, "w") as f:
+                f.write("performance")
+            success = True
+        except Exception:
+            try:
+                subprocess.run(f"echo performance | sudo tee {gov}", shell=True, capture_output=True, timeout=1.0)
+                success = True
+            except Exception:
+                pass
+
+    try:
+        os.nice(-10)
+    except Exception:
+        pass
+
+    if success:
+        logger.info("[INFO] Set Raspberry Pi CPU governor to 'performance' (constant clock frequency).")
+    return success
+
+
+def is_pca9685_present(bus_id: int = I2C_BUS, address: int = 0x40) -> bool:
+    """Check if PCA9685 16-channel PWM controller is detected on I2C bus."""
+    smbus2 = _load_optional_module("smbus2")
+    if smbus2 is not None:
+        try:
+            bus = smbus2.SMBus(bus_id)
+            bus.read_byte_data(address, 0x00)
+            bus.close()
+            return True
+        except Exception:
+            return False
+    return False
+
+
+class PCA9685Backend(GPIOBackend):
+    """Hardware I2C 16-channel 12-bit PWM generator (constant 50 Hz from onboard 25 MHz oscillator)."""
+
+    def __init__(self, bus_id: int = I2C_BUS, address: int = 0x40, freq_hz: float = DEFAULT_PWM_FREQ_HZ) -> None:
+        self.bus_id = bus_id
+        self.address = address
+        self.freq_hz = freq_hz
+        self._current_pulses: Dict[int, float] = {}
+        self._bus = None
+        self._pca = None
+
+        # 1. Try adafruit_pca9685
+        adafruit_pca = _load_optional_module("adafruit_pca9685")
+        busio = _load_optional_module("busio")
+        board = _load_optional_module("board")
+        if adafruit_pca is not None and busio is not None and board is not None:
+            try:
+                i2c = busio.I2C(board.SCL, board.SDA)
+                self._pca = adafruit_pca.PCA9685(i2c, address=address)
+                self._pca.frequency = int(round(freq_hz))
+                logger.info(f"[INFO] Initialized PCA9685 via Adafruit library at 0x{address:02x} ({freq_hz} Hz).")
+                return
+            except Exception:
+                self._pca = None
+
+        # 2. Try smbus2 direct I2C registers
+        smbus2 = _load_optional_module("smbus2")
+        if smbus2 is not None:
+            try:
+                self._bus = smbus2.SMBus(bus_id)
+                self._init_pca9685_raw()
+                logger.info(f"[INFO] Initialized PCA9685 via smbus2 at 0x{address:02x} ({freq_hz} Hz).")
+                return
+            except Exception as e:
+                self._bus = None
+                raise ConnectionError(f"Cannot initialize PCA9685 on I2C bus {bus_id} at 0x{address:02x}: {e}")
+
+        raise ImportError("Neither adafruit_pca9685 nor smbus2 is available for PCA9685.")
+
+    def _init_pca9685_raw(self) -> None:
+        # MODE1 sleep mode to allow PRE_SCALE update
+        self._bus.write_byte_data(self.address, 0x00, 0x10)
+        # PRE_SCALE = round(25000000 / (4096 * freq)) - 1
+        prescale = int(round(25_000_000.0 / (4096.0 * self.freq_hz))) - 1
+        self._bus.write_byte_data(self.address, 0xFE, prescale)
+        # MODE1 normal mode
+        self._bus.write_byte_data(self.address, 0x00, 0x00)
+        time.sleep(0.005)
+        # MODE1 auto-increment enabled
+        self._bus.write_byte_data(self.address, 0x00, 0xA1)
+
+    def _channel_for_pin(self, pin: int) -> int:
+        pin_map = {
+            PIN_SERVO_SHOULDER_A: 0,
+            PIN_SERVO_SHOULDER_B: 1,
+            PIN_SERVO_ELBOW: 2,
+            PIN_SERVO_WRIST_PITCH: 3,
+            PIN_SERVO_WRIST_ROLL: 4,
+            PIN_SERVO_GRIPPER: 5,
+        }
+        return pin_map.get(pin, pin if 0 <= pin <= 15 else 0)
+
+    def setup_output(self, pin: int) -> None:
+        pass
+
+    def write_digital(self, pin: int, value: int) -> None:
+        ch = self._channel_for_pin(pin)
+        self.set_pwm_duty(ch, 100.0 if value else 0.0)
+
+    def start_pwm(self, pin: int, freq_hz: float, duty_percent: float) -> None:
+        self.set_pwm_duty(pin, duty_percent)
+
+    def set_pwm_duty(self, pin: int, duty_percent: float) -> None:
+        pulse_us = (duty_percent / 100.0) * (1_000_000.0 / self.freq_hz)
+        self.set_servo_pulse(pin, pulse_us)
+
+    def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
+        ch = self._channel_for_pin(pin)
+        if abs(self._current_pulses.get(ch, -1.0) - pulse_us) < 0.5:
+            return
+        self._current_pulses[ch] = pulse_us
+
+        if pulse_us <= 0.0:
+            off_tick = 0
+        else:
+            period_us = 1_000_000.0 / self.freq_hz
+            off_tick = int(round((pulse_us / period_us) * 4095.0))
+            off_tick = max(0, min(4095, off_tick))
+
+        if self._pca is not None:
+            self._pca.channels[ch].duty_cycle = int((off_tick / 4095.0) * 65535.0)
+        elif self._bus is not None:
+            reg = 0x06 + 4 * ch
+            if off_tick == 0:
+                self._bus.write_i2c_block_data(self.address, reg, [0, 0, 0, 0x10])
+            else:
+                self._bus.write_i2c_block_data(self.address, reg, [0, 0, off_tick & 0xFF, (off_tick >> 8) & 0x0F])
+
+    def stop_pwm(self, pin: int) -> None:
+        self.set_servo_pulse(pin, 0.0)
+
+    def cleanup(self) -> None:
+        for ch in list(self._current_pulses.keys()):
+            self.stop_pwm(ch)
+        self._current_pulses.clear()
+        if self._bus is not None:
+            try:
+                self._bus.close()
+            except Exception:
+                pass
+
+
 class PiGPIOBackend(GPIOBackend):
     """Hardware DMA-timed GPIO backend using pigpio daemon (0% CPU jitter)."""
 
@@ -139,9 +326,13 @@ class PiGPIOBackend(GPIOBackend):
             raise ImportError("pigpio module is not installed")
         self.pi = self.pigpio.pi(host, port)
         if not self.pi.connected:
+            if ensure_pigpiod_running():
+                self.pi = self.pigpio.pi(host, port)
+        if not self.pi.connected:
             raise ConnectionError("pigpiod daemon is not running. Run: sudo systemctl start pigpiod")
         self.active_pins: List[int] = []
         self._warned_pins: set = set()
+        self._current_pulses: Dict[int, int] = {}
 
     def _is_valid_user_gpio(self, pin: int) -> bool:
         if not (0 <= pin <= 27):
@@ -190,16 +381,22 @@ class PiGPIOBackend(GPIOBackend):
         """Direct DMA hardware-timed servo pulse width in microseconds (500-2500 us, 0=off)."""
         if not self._is_valid_user_gpio(pin):
             return
+        pulse_int = int(round(pulse_us)) if pulse_us > 0.0 else 0
+        if self._current_pulses.get(pin) == pulse_int:
+            return
+        self._current_pulses[pin] = pulse_int
+
         if pin not in self.active_pins:
             self.setup_output(pin)
         try:
-            self.pi.set_servo_pulsewidth(pin, int(round(pulse_us)))
+            self.pi.set_servo_pulsewidth(pin, pulse_int)
         except Exception as e:
             logger.warning(f"[WARNING] pigpio failed to set servo pulse on pin {pin}: {e}")
 
     def stop_pwm(self, pin: int) -> None:
         if not self._is_valid_user_gpio(pin):
             return
+        self._current_pulses[pin] = 0
         try:
             self.pi.set_servo_pulsewidth(pin, 0)
         except Exception:
@@ -211,6 +408,7 @@ class PiGPIOBackend(GPIOBackend):
                 self.pi.set_servo_pulsewidth(pin, 0)
             except Exception:
                 pass
+        self._current_pulses.clear()
         try:
             self.pi.stop()
         except Exception:
@@ -226,6 +424,7 @@ class LGPIOBackend(GPIOBackend):
             raise ImportError("lgpio module is not installed")
         self.handle = self.lgpio.gpiochip_open(chip)
         self.active_pins: List[int] = []
+        self._current_pulses: Dict[int, int] = {}
 
     def setup_output(self, pin: int) -> None:
         try:
@@ -242,35 +441,33 @@ class LGPIOBackend(GPIOBackend):
             pass
 
     def start_pwm(self, pin: int, freq_hz: float, duty_percent: float) -> None:
-        try:
-            self.lgpio.tx_pwm(self.handle, pin, int(freq_hz), float(duty_percent))
-        except Exception as e:
-            logger.warning(f"[WARNING] LGPIO failed to start PWM on pin {pin}: {e}")
+        pulse_us = (duty_percent / 100.0) * (1_000_000.0 / freq_hz)
+        self.set_servo_pulse(pin, pulse_us)
 
     def set_pwm_duty(self, pin: int, duty_percent: float) -> None:
-        try:
-            if duty_percent <= 0.0:
-                self.lgpio.tx_pwm(self.handle, pin, 0, 0)
-            else:
-                self.lgpio.tx_pwm(self.handle, pin, int(DEFAULT_PWM_FREQ_HZ), float(duty_percent))
-        except Exception:
-            pass
+        pulse_us = (duty_percent / 100.0) * 20000.0
+        self.set_servo_pulse(pin, pulse_us)
 
     def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
-        """Hardware/software timed servo pulse via lgpio tx_servo with fallback to tx_pwm."""
+        """Hardware/software timed servo pulse via lgpio tx_servo with pulse deduplication."""
+        pulse_int = int(round(pulse_us)) if pulse_us > 0.0 else 0
+        if self._current_pulses.get(pin) == pulse_int:
+            return
+        self._current_pulses[pin] = pulse_int
+
         if pin not in self.active_pins:
             self.setup_output(pin)
         try:
             if hasattr(self.lgpio, "tx_servo"):
-                pulse_int = int(round(pulse_us)) if pulse_us > 0.0 else 0
                 self.lgpio.tx_servo(self.handle, pin, pulse_int, int(DEFAULT_PWM_FREQ_HZ))
             else:
                 duty = (pulse_us / (1_000_000.0 / DEFAULT_PWM_FREQ_HZ)) * 100.0
-                self.set_pwm_duty(pin, duty)
+                self.lgpio.tx_pwm(self.handle, pin, int(DEFAULT_PWM_FREQ_HZ), float(duty))
         except Exception as e:
             logger.warning(f"[WARNING] LGPIO set_servo_pulse failed on pin {pin}: {e}")
 
     def stop_pwm(self, pin: int) -> None:
+        self._current_pulses[pin] = 0
         try:
             if hasattr(self.lgpio, "tx_servo"):
                 self.lgpio.tx_servo(self.handle, pin, 0, int(DEFAULT_PWM_FREQ_HZ))
@@ -285,6 +482,7 @@ class LGPIOBackend(GPIOBackend):
                 self.lgpio.gpio_free(self.handle, pin)
             except Exception:
                 pass
+        self._current_pulses.clear()
         try:
             self.lgpio.gpiochip_close(self.handle)
         except Exception:
@@ -302,6 +500,7 @@ class RPiGPIOBackend(GPIOBackend):
         self.GPIO.setwarnings(False)
         self.pwm_instances: Dict[int, Any] = {}
         self.active_pins: List[int] = []
+        self._current_duties: Dict[int, float] = {}
 
     def setup_output(self, pin: int) -> None:
         try:
@@ -325,18 +524,23 @@ class RPiGPIOBackend(GPIOBackend):
                 pwm = self.GPIO.PWM(pin, freq_hz)
                 pwm.start(duty_percent)
                 self.pwm_instances[pin] = pwm
+                self._current_duties[pin] = duty_percent
             except Exception as e:
                 logger.warning(f"[WARNING] RPi.GPIO failed to start PWM on pin {pin}: {e}")
         else:
-            self.pwm_instances[pin].ChangeDutyCycle(duty_percent)
+            self.set_pwm_duty(pin, duty_percent)
 
     def set_pwm_duty(self, pin: int, duty_percent: float) -> None:
+        if abs(self._current_duties.get(pin, -1.0) - duty_percent) < 0.05:
+            return
+        self._current_duties[pin] = duty_percent
         if pin in self.pwm_instances:
             self.pwm_instances[pin].ChangeDutyCycle(duty_percent)
         else:
             self.start_pwm(pin, DEFAULT_PWM_FREQ_HZ, duty_percent)
 
     def stop_pwm(self, pin: int) -> None:
+        self._current_duties[pin] = 0.0
         if pin in self.pwm_instances:
             try:
                 self.pwm_instances[pin].stop()
@@ -351,6 +555,7 @@ class RPiGPIOBackend(GPIOBackend):
             except Exception:
                 pass
         self.pwm_instances.clear()
+        self._current_duties.clear()
         try:
             self.GPIO.cleanup()
         except Exception:
@@ -358,9 +563,18 @@ class RPiGPIOBackend(GPIOBackend):
 
 
 def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
-    """Return the most precise hardware GPIO backend available."""
+    """Return the most precise hardware GPIO backend available (PCA9685 -> pigpio DMA -> lgpio -> RPi.GPIO -> Mock)."""
     if force_mock:
         return MockGPIOBackend()
+
+    # 0. PCA9685 I2C Hardware PWM (16-channel constant 50 Hz from onboard crystal oscillator)
+    if os.environ.get("USE_PCA9685", "0") == "1" or is_pca9685_present():
+        try:
+            backend = PCA9685Backend()
+            logger.info("[INFO] Using PCA9685 I2C Hardware PWM (100% constant frequency, 0% CPU jitter).")
+            return backend
+        except Exception as e:
+            logger.warning(f"[WARNING] PCA9685 detected but failed to initialize: {e}")
 
     # 1. pigpio: DMA-based hardware PWM (zero jitter on Pi Zero / 1 / 2 / 3 / 4)
     pigpio_err: Optional[Exception] = None
@@ -377,11 +591,11 @@ def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
         if pigpio_err is not None:
             logger.warning(
                 f"[WARNING] pigpiod daemon is not running ({pigpio_err})!\n"
-                f"          Using LGPIOBackend with software timing — SERVOS WILL JITTER / TWITCH!\n"
-                f"          To fix jitter, start the daemon: 'sudo pigpiod' or 'sudo systemctl start pigpiod'."
+                f"          Using LGPIOBackend with pulse deduplication.\n"
+                f"          To enable DMA hardware timing, start: 'sudo pigpiod -t 0 -s 2'."
             )
         else:
-            logger.info("[INFO] Using LGPIOBackend.")
+            logger.info("[INFO] Using LGPIOBackend with pulse deduplication.")
         return backend
     except Exception:
         pass
@@ -390,8 +604,8 @@ def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
     try:
         backend = RPiGPIOBackend()
         logger.warning(
-            "[WARNING] Using legacy RPi.GPIO software PWM — SERVOS WILL JITTER / TWITCH!\n"
-            "          To fix jitter, start the daemon: 'sudo pigpiod' or 'sudo systemctl start pigpiod'."
+            "[WARNING] Using legacy RPi.GPIO software PWM.\n"
+            "          To enable DMA hardware timing, start: 'sudo pigpiod -t 0 -s 2'."
         )
         return backend
     except Exception:
@@ -402,7 +616,7 @@ def get_default_gpio_backend(force_mock: bool = False) -> GPIOBackend:
 
 
 class StepperDriverA4988:
-    """A4988 Stepper driver for NEMA 17 azimuth base (revolute_1)."""
+    """A4988 Stepper driver for NEMA 17 azimuth base (revolute_1) with constant step frequency."""
 
     def __init__(
         self,
@@ -414,6 +628,7 @@ class StepperDriverA4988:
         microsteps: int = 16,
         min_angle_rad: float = -math.pi,
         max_angle_rad: float = math.pi,
+        step_freq_hz: float = 800.0,
     ) -> None:
         self.gpio = gpio
         self.step_pin = step_pin
@@ -423,6 +638,7 @@ class StepperDriverA4988:
         self.steps_per_rad = self.total_steps_per_rev / (2.0 * math.pi)
         self.min_angle_rad = min_angle_rad
         self.max_angle_rad = max_angle_rad
+        self.step_freq_hz = step_freq_hz
 
         self.current_steps: int = 0
         self.target_steps: int = 0
@@ -450,29 +666,53 @@ class StepperDriverA4988:
         return self.target_steps
 
     def step_once(self) -> bool:
-        """Perform a single step towards target. Returns True if a step occurred."""
+        """Perform a single step towards target with guaranteed pulse shape. Returns True if a step occurred."""
         diff = self.target_steps - self.current_steps
         if diff == 0:
             return False
 
         direction = 1 if diff > 0 else 0
         self.gpio.write_digital(self.dir_pin, direction)
+
+        # Crisp HIGH pulse with guaranteed minimum width (5 us) for A4988 trigger
         self.gpio.write_digital(self.step_pin, 1)
+        t0 = time.perf_counter()
+        while (time.perf_counter() - t0) < 0.000005:
+            pass
         self.gpio.write_digital(self.step_pin, 0)
 
         self.current_steps += 1 if diff > 0 else -1
         self.current_angle_rad = self.steps_to_rad(self.current_steps)
         return True
 
-    def step_towards_target(self, max_steps: Optional[int] = None) -> int:
-        """Step towards target up to max_steps. Returns number of steps performed."""
+    def step_towards_target(self, max_steps: Optional[int] = None, step_rate_hz: Optional[float] = None) -> int:
+        """Step towards target at a CONSTANT frequency. Returns number of steps performed."""
+        rate = step_rate_hz or self.step_freq_hz
+        interval = 1.0 / rate if rate > 0 else 0.001
         count = 0
+        next_step_time = time.perf_counter()
+
         while self.current_steps != self.target_steps:
             if max_steps is not None and count >= max_steps:
                 break
+
+            now = time.perf_counter()
+            if now < next_step_time:
+                rem = next_step_time - now
+                if rem > 0.001:
+                    time.sleep(rem - 0.0005)
+                while time.perf_counter() < next_step_time:
+                    pass
+
             self.step_once()
+            next_step_time += interval
             count += 1
         return count
+
+    def emergency_stop(self) -> None:
+        """Abort motion and freeze at current position."""
+        self.target_steps = self.current_steps
+        self.gpio.write_digital(self.step_pin, 0)
 
     def emergency_stop(self) -> None:
         """Abort motion and freeze at current position."""
@@ -572,15 +812,14 @@ class ServoController:
 
         self._active_pins: set = set()
 
-    def _ensure_pin_active(self, pin: int, initial_duty: float = 7.5) -> None:
-        """Lazily initialize output pin and start PWM only when servo is first commanded."""
+    def _ensure_pin_active(self, pin: int) -> None:
+        """Lazily initialize output pin when servo is first commanded."""
         if pin not in self._active_pins:
             try:
                 self.gpio.setup_output(pin)
-                self.gpio.start_pwm(pin, self.freq_hz, initial_duty)
                 self._active_pins.add(pin)
             except Exception as e:
-                logger.warning(f"[WARNING] Could not activate PWM on GPIO {pin}: {e}")
+                logger.warning(f"[WARNING] Could not activate GPIO {pin}: {e}")
 
     def set_shoulder_angle(self, angle_rad: float) -> Tuple[float, float]:
         """Apply angle to Shoulder A and mechanically reversed Shoulder B. Returns (pulse_a, pulse_b)."""
@@ -590,11 +829,8 @@ class ServoController:
         pulse_a = cfg_a.angle_to_pulse_us(angle_rad)
         pulse_b = cfg_b.angle_to_pulse_us(angle_rad)
 
-        duty_a = cfg_a.pulse_us_to_duty_cycle(pulse_a, self.freq_hz)
-        duty_b = cfg_b.pulse_us_to_duty_cycle(pulse_b, self.freq_hz)
-
-        self._ensure_pin_active(cfg_a.pin, initial_duty=duty_a)
-        self._ensure_pin_active(cfg_b.pin, initial_duty=duty_b)
+        self._ensure_pin_active(cfg_a.pin)
+        self._ensure_pin_active(cfg_b.pin)
         self.gpio.set_servo_pulse(cfg_a.pin, pulse_a)
         self.gpio.set_servo_pulse(cfg_b.pin, pulse_b)
         self.current_angles["revolute_2"] = angle_rad
@@ -609,8 +845,7 @@ class ServoController:
             raise KeyError(f"Unknown servo: {servo_name}. Valid keys: {list(self.configs.keys())}")
         cfg = self.configs[key]
         pulse = cfg.angle_to_pulse_us(angle_rad)
-        duty = cfg.pulse_us_to_duty_cycle(pulse, self.freq_hz)
-        self._ensure_pin_active(cfg.pin, initial_duty=duty)
+        self._ensure_pin_active(cfg.pin)
         self.gpio.set_servo_pulse(cfg.pin, pulse)
         self.current_angles[key] = angle_rad
         return pulse
@@ -625,13 +860,13 @@ class ServoController:
             p_a = self.configs["shoulder_a"].pin
             p_b = self.configs["shoulder_b"].pin
             if p_a in self._active_pins:
-                self.gpio.set_pwm_duty(p_a, 0.0)
+                self.gpio.set_servo_pulse(p_a, 0.0)
             if p_b in self._active_pins:
-                self.gpio.set_pwm_duty(p_b, 0.0)
+                self.gpio.set_servo_pulse(p_b, 0.0)
         elif key in self.configs:
             p = self.configs[key].pin
             if p in self._active_pins:
-                self.gpio.set_pwm_duty(p, 0.0)
+                self.gpio.set_servo_pulse(p, 0.0)
 
     def set_joint_angle(self, joint_name: str, angle_rad: float) -> float:
         """Set joint angle in radians. Returns pulse width in microseconds."""
@@ -702,7 +937,7 @@ class ServoController:
     def emergency_stop(self) -> None:
         """Cut off PWM duty cycle to safely release servo torque."""
         for cfg in self.configs.values():
-            self.gpio.set_pwm_duty(cfg.pin, 0.0)
+            self.gpio.set_servo_pulse(cfg.pin, 0.0)
 
 
 class ToFReaderVL53L0X:

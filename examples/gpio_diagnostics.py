@@ -9,9 +9,23 @@ It supports:
 """
 
 import argparse
+import os
 import sys
 import time
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+
+_SRC_DIR = str(Path(__file__).resolve().parent.parent / "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
+try:
+    from manipulator3.hardware import ensure_pigpiod_running, set_rpi_cpu_performance_mode
+except Exception:
+    def ensure_pigpiod_running() -> bool:
+        return False
+    def set_rpi_cpu_performance_mode() -> bool:
+        return False
 
 MANIPULATOR_PINS: Dict[str, Dict[str, Any]] = {
     "shoulder_a": {"name": "Shoulder A (MG996R)", "bcm": 26, "phys": 37, "gnd": 39},
@@ -67,10 +81,14 @@ class DirectGPIOController:
         self._lgpio_mod = None
         self._rpi_gpio = None
         self._active_pins: set[int] = set()
+        self._current_pulses: Dict[int, int] = {}
 
         if force_mock:
             self.backend_name = "Mock (Virtual)"
             return
+
+        set_rpi_cpu_performance_mode()
+        ensure_pigpiod_running()
 
         # 1. Try pigpio (best for DMA PWM)
         try:
@@ -128,11 +146,16 @@ class DirectGPIOController:
     def set_servo_pulse(self, bcm_pin: int, pulse_us: float) -> None:
         if bcm_pin not in self._active_pins:
             self.setup_output(bcm_pin)
+        pulse_int = int(round(pulse_us)) if pulse_us > 0.0 else 0
+        if self._current_pulses.get(bcm_pin) == pulse_int:
+            return
+        self._current_pulses[bcm_pin] = pulse_int
+
         if self._pigpio_pi:
-            self._pigpio_pi.set_servo_pulsewidth(bcm_pin, int(round(pulse_us)))
+            self._pigpio_pi.set_servo_pulsewidth(bcm_pin, pulse_int)
         elif self._lgpio_handle is not None and self._lgpio_mod is not None:
             if hasattr(self._lgpio_mod, "tx_servo"):
-                self._lgpio_mod.tx_servo(self._lgpio_handle, bcm_pin, int(round(pulse_us)), 50)
+                self._lgpio_mod.tx_servo(self._lgpio_handle, bcm_pin, pulse_int, 50)
             else:
                 duty = (pulse_us / 20000.0) * 100.0
                 self._lgpio_mod.tx_pwm(self._lgpio_handle, bcm_pin, 50, float(duty))
@@ -142,6 +165,7 @@ class DirectGPIOController:
             pwm.start(duty)
 
     def stop_pwm(self, bcm_pin: int) -> None:
+        self._current_pulses[bcm_pin] = 0
         if self._pigpio_pi:
             self._pigpio_pi.set_servo_pulsewidth(bcm_pin, 0)
         elif self._lgpio_handle is not None and self._lgpio_mod is not None:
@@ -232,13 +256,22 @@ def run_blink_test(ctl: DirectGPIOController, bcm: int, phys: int, gnd: int, lab
 
     start = time.time()
     state = 0
+    interval = 0.5
+    next_tick = time.perf_counter()
     try:
         while True:
+            now = time.perf_counter()
+            if now < next_tick:
+                rem = next_tick - now
+                if rem > 0.002:
+                    time.sleep(rem - 0.001)
+                while time.perf_counter() < next_tick:
+                    pass
+            next_tick += interval
             state = 1 - state
             ctl.write(bcm, state)
             sys.stdout.write(f"\r  -> State: {'[ HIGH +3.3V ]' if state else '[  LOW  0.0V ]'}")
             sys.stdout.flush()
-            time.sleep(0.5)
             if duration_sec and (time.time() - start) >= duration_sec:
                 break
     except KeyboardInterrupt:
@@ -246,6 +279,46 @@ def run_blink_test(ctl: DirectGPIOController, bcm: int, phys: int, gnd: int, lab
     finally:
         ctl.write(bcm, 0)
         print("\n[OK] Blink test stopped. Pin reset to 0.0V.")
+
+
+def run_freq_test(ctl: DirectGPIOController, bcm: int, phys: int, gnd: int, label: str, freq_hz: float = 800.0, duration_sec: Optional[float] = None) -> None:
+    print("\n" + "=" * 65)
+    print(f"[*] CONSTANT FREQUENCY STEP WAVE TEST ({freq_hz:.1f} Hz): {label}")
+    print(f"    - BCM GPIO:       {bcm}")
+    print(f"    - Physical Pin:   {phys}  (Signal)")
+    print(f"    - Ground (GND):   {gnd}  (GND clip)")
+    print(f"    - Target Freq:    {freq_hz:.1f} Hz (Period: {1000.0/freq_hz:.3f} ms)")
+    print("    - Scope settings: 1V/div, Timebase: 0.5ms/div or 1ms/div")
+    print("=" * 65)
+    print("Generating constant frequency pulses... Press Ctrl+C to stop.")
+
+    interval = 1.0 / freq_hz
+    next_tick = time.perf_counter()
+    start = time.time()
+    try:
+        while True:
+            now = time.perf_counter()
+            if now < next_tick:
+                rem = next_tick - now
+                if rem > 0.001:
+                    time.sleep(rem - 0.0005)
+                while time.perf_counter() < next_tick:
+                    pass
+            next_tick += interval
+
+            ctl.write(bcm, 1)
+            t0 = time.perf_counter()
+            while (time.perf_counter() - t0) < 0.000005:
+                pass
+            ctl.write(bcm, 0)
+
+            if duration_sec and (time.time() - start) >= duration_sec:
+                break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        ctl.write(bcm, 0)
+        print("\n[OK] Frequency test stopped. Pin reset to 0.0V.")
 
 
 def run_pwm_test(ctl: DirectGPIOController, bcm: int, phys: int, gnd: int, label: str, duration_sec: Optional[float] = None) -> None:
@@ -345,22 +418,26 @@ def interactive_menu(ctl: DirectGPIOController) -> None:
         print("  1. Static 3.3V / 0V test (Multimeter / DC scope)")
         print("  2. Slow 1 Hz blink (Square wave)")
         print("  3. Continuous 50 Hz Servo PWM (1500 µs)")
+        print("  4. Constant Frequency Step Pulse Wave (800 Hz)")
         print("  B. Back to main menu")
 
-        mode_choice = input("Choose mode [1-3]: ").strip().lower()
+        mode_choice = input("Choose mode [1-4]: ").strip().lower()
         if mode_choice == "1":
             run_static_test(ctl, target_bcm, target_phys, target_gnd, target_label)
         elif mode_choice == "2":
             run_blink_test(ctl, target_bcm, target_phys, target_gnd, target_label)
         elif mode_choice == "3":
             run_pwm_test(ctl, target_bcm, target_phys, target_gnd, target_label)
+        elif mode_choice == "4":
+            run_freq_test(ctl, target_bcm, target_phys, target_gnd, target_label, freq_hz=800.0)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Raspberry Pi GPIO Pin Diagnostics Tool")
     parser.add_argument("--pin", type=str, default=None, help="Motor name (e.g. 'elbow') or BCM pin number (e.g. 13)")
-    parser.add_argument("--mode", choices=["static", "blink", "pwm", "all"], default=None, help="Test mode")
-    parser.add_argument("--duration", type=float, default=None, help="Duration in seconds for blink/pwm mode")
+    parser.add_argument("--mode", choices=["static", "blink", "pwm", "freq", "all"], default=None, help="Test mode")
+    parser.add_argument("--freq", type=float, default=800.0, help="Frequency in Hz for freq mode (default: 800 Hz)")
+    parser.add_argument("--duration", type=float, default=None, help="Duration in seconds for blink/pwm/freq mode")
     parser.add_argument("--mock", action="store_true", help="Force Mock backend for local testing")
     args = parser.parse_args()
 
@@ -381,6 +458,8 @@ def main() -> int:
                 run_blink_test(ctl, bcm, phys, gnd, label, duration_sec=args.duration)
             elif mode == "pwm":
                 run_pwm_test(ctl, bcm, phys, gnd, label, duration_sec=args.duration)
+            elif mode == "freq":
+                run_freq_test(ctl, bcm, phys, gnd, label, freq_hz=args.freq, duration_sec=args.duration)
             return 0
 
         interactive_menu(ctl)
@@ -392,3 +471,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

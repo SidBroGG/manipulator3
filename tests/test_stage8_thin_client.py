@@ -214,3 +214,66 @@ def test_thin_client_zenoh_loop():
     finally:
         host.close()
         thin.close()
+
+
+def test_frequency_stability_pulse_deduplication(monkeypatch):
+    """Verify PiGPIOBackend deduplicates identical pulses to maintain constant frequency."""
+    from unittest.mock import MagicMock
+    from manipulator3.hardware import PiGPIOBackend
+
+    mock_pi = MagicMock()
+    mock_pi.connected = True
+    mock_pigpio_mod = MagicMock()
+    mock_pigpio_mod.pi.return_value = mock_pi
+    mock_pigpio_mod.OUTPUT = 1
+
+    monkeypatch.setattr("manipulator3.hardware._load_optional_module", lambda name: mock_pigpio_mod if name == "pigpio" else None)
+
+    backend = PiGPIOBackend()
+    backend.set_servo_pulse(18, 1500.0)
+    assert mock_pi.set_servo_pulsewidth.call_count == 1
+
+    # Second call with identical pulse width must NOT re-call pigpio to prevent phase interruption
+    backend.set_servo_pulse(18, 1500.0)
+    assert mock_pi.set_servo_pulsewidth.call_count == 1
+
+    # Different pulse width must trigger update
+    backend.set_servo_pulse(18, 1600.0)
+    assert mock_pi.set_servo_pulsewidth.call_count == 2
+
+
+def test_stepper_constant_frequency_pacing():
+    """Verify stepper driver paces step execution at requested step frequency."""
+    gpio = MockGPIOBackend()
+    stepper = StepperDriverA4988(gpio, step_freq_hz=400.0)
+    stepper.target_steps = 20
+
+    t0 = time.perf_counter()
+    stepper.step_towards_target()
+    elapsed = time.perf_counter() - t0
+
+    # 20 steps at 400 Hz should take ~0.05s (at least 0.04s)
+    assert stepper.current_steps == 20
+    assert elapsed >= 0.035
+
+
+def test_pca9685_backend_register_programming(monkeypatch):
+    """Verify PCA9685 writes prescale for 50Hz and converts pulse microseconds to 12-bit ticks."""
+    from unittest.mock import MagicMock
+    from manipulator3.hardware import PCA9685Backend
+
+    mock_bus = MagicMock()
+    mock_smbus2 = MagicMock()
+    mock_smbus2.SMBus.return_value = mock_bus
+
+    monkeypatch.setattr("manipulator3.hardware._load_optional_module", lambda name: mock_smbus2 if name == "smbus2" else None)
+
+    backend = PCA9685Backend(bus_id=1, address=0x40, freq_hz=50.0)
+    # Check 50Hz prescale write: round(25e6 / (4096 * 50)) - 1 = 121
+    mock_bus.write_byte_data.assert_any_call(0x40, 0xFE, 121)
+
+    # Test 1500 us pulse on channel 0 (Shoulder A / BCM 26)
+    # 1500 us in 20000 us period -> (1500 / 20000) * 4095 = 307.125 -> 307 (0x0133)
+    backend.set_servo_pulse(26, 1500.0)
+    mock_bus.write_i2c_block_data.assert_called_with(0x40, 0x06, [0, 0, 0x33, 0x01])
+
