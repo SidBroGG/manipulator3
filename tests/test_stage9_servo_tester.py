@@ -166,3 +166,30 @@ def test_gpio_diagnostics_mock_execution():
     assert "Pin is now HIGH (+3.3V)" in res.stdout
 
 
+def test_direct_gpio_controller_pigpio_setup_output():
+    """Verify DirectGPIOController in gpio_diagnostics sets mode without AttributeError."""
+    from unittest.mock import MagicMock
+    import sys
+    from pathlib import Path
+
+    examples_path = str(Path(__file__).resolve().parent.parent / "examples")
+    if examples_path not in sys.path:
+        sys.path.insert(0, examples_path)
+
+    import gpio_diagnostics
+    ctl = gpio_diagnostics.DirectGPIOController(force_mock=True)
+
+    mock_pi = MagicMock()
+    mock_pigpio_mod = MagicMock()
+    mock_pigpio_mod.OUTPUT = 1
+    mock_pigpio_mod.PUD_OFF = 0
+
+    ctl._pigpio_pi = mock_pi
+    ctl._pigpio_mod = mock_pigpio_mod
+
+    ctl.setup_output(26)
+    mock_pi.set_mode.assert_called_with(26, 1)
+    mock_pi.set_pull_up_down.assert_called_with(26, 0)
+
+
+

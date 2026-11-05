@@ -99,6 +99,7 @@ class DirectGPIOController:
                 pi = pigpio.pi()
             if pi.connected:
                 self._pigpio_pi = pi
+                self._pigpio_mod = pigpio
                 self.backend_name = "pigpio (DMA hardware PWM - ZERO JITTER)"
                 try:
                     self._pigpio_pi.set_pad_strength(0, 16)
@@ -133,9 +134,11 @@ class DirectGPIOController:
 
     def setup_output(self, bcm_pin: int) -> None:
         if self._pigpio_pi:
-            self._pigpio_pi.set_mode(bcm_pin, self._pigpio_pi.OUTPUT)
+            out_mode = getattr(self._pigpio_mod, "OUTPUT", 1)
+            self._pigpio_pi.set_mode(bcm_pin, out_mode)
             try:
-                self._pigpio_pi.set_pull_up_down(bcm_pin, self._pigpio_pi.PUD_OFF)
+                pud_off = getattr(self._pigpio_mod, "PUD_OFF", 0)
+                self._pigpio_pi.set_pull_up_down(bcm_pin, pud_off)
             except Exception:
                 pass
         elif self._lgpio_handle is not None and self._lgpio_mod is not None:
