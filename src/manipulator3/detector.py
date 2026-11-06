@@ -265,10 +265,10 @@ class ColorBlobDetector:
             ((35, 80, 50), (85, 255, 255)),
         ],
         "blue_box": [
-            ((95, 80, 50), (135, 255, 255)),
+            ((95, 175, 50), (135, 255, 255)),
         ],
         "yellow_target": [
-            ((18, 100, 50), (35, 255, 255)),
+            ((20, 100, 50), (35, 255, 255)),
         ],
     }
 
@@ -297,9 +297,10 @@ class ColorBlobDetector:
                 mask = cv2.bitwise_or(mask, sub_mask)
 
             # Morphological noise cleanup
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+            kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_open)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
 
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             for cnt in contours:
@@ -308,6 +309,10 @@ class ColorBlobDetector:
                     continue
 
                 x, y, bw, bh = cv2.boundingRect(cnt)
+                # Filter out background or skybox contours spanning almost the full frame
+                if bw >= w - 10 and bh >= h - 10:
+                    continue
+
                 # Compute confidence based on fill ratio of bounding box
                 fill_ratio = float(area / (bw * bh + 1e-6))
                 confidence = float(np.clip(fill_ratio * 0.95 + 0.05, 0.1, 0.99))

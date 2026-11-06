@@ -96,16 +96,8 @@ class VisualServoController:
             return new_q, True
 
         dq_yaw, dq_pitch = self.compute_joint_deltas(target)
-
-        # Smooth update based on actual physical state to eliminate delay-induced overshoot
-        if actual_q is not None:
-            base_yaw = actual_q[JOINT_YAW]
-            base_pitch = actual_q[JOINT_PITCH]
-            new_q[JOINT_YAW] = 0.5 * current_q[JOINT_YAW] + 0.5 * (base_yaw + dq_yaw)
-            new_q[JOINT_PITCH] = 0.5 * current_q[JOINT_PITCH] + 0.5 * (base_pitch + dq_pitch)
-        else:
-            new_q[JOINT_YAW] += dq_yaw
-            new_q[JOINT_PITCH] += dq_pitch
+        new_q[JOINT_YAW] += dq_yaw
+        new_q[JOINT_PITCH] += dq_pitch
 
         # Clamp within hardware limits
         lim_yaw = self.joint_limits.get(JOINT_YAW, (-3.14159, 3.14159))

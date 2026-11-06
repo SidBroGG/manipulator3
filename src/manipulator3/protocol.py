@@ -1,9 +1,41 @@
+import importlib
 from dataclasses import dataclass, field
 import json
 import time
-from typing import Dict, List, Union, Optional
-import cv2
-import numpy as np
+from typing import Any, Dict, List, Union, Optional
+
+
+def _load_optional_module(name: str) -> Optional[Any]:
+    try:
+        return importlib.import_module(name)
+    except Exception:
+        return None
+
+
+_cv2: Optional[Any] = None
+_np: Optional[Any] = None
+
+
+def _get_cv2() -> Optional[Any]:
+    global _cv2
+    if _cv2 is None:
+        _cv2 = _load_optional_module("cv2")
+    return _cv2
+
+
+def _get_np() -> Optional[Any]:
+    global _np
+    if _np is None:
+        _np = _load_optional_module("numpy")
+    return _np
+
+
+def __getattr__(name: str) -> Any:
+    if name == "cv2":
+        return _get_cv2()
+    if name == "np":
+        return _get_np()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 TOPIC_CAMERA_RAW = "manipulator/camera/raw"
 TOPIC_TOF_RANGE = "manipulator/tof/range"
@@ -128,18 +160,25 @@ class RobotStatus:
         return cls.from_dict(json.loads(data.decode("utf-8")))
 
 
-def encode_jpeg(image: np.ndarray, quality: int = 80) -> bytes:
+def encode_jpeg(image: Any, quality: int = 80) -> bytes:
     """Encode OpenCV BGR image to JPEG bytes."""
-    success, buffer = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+    cv2_mod = _get_cv2()
+    if cv2_mod is None:
+        raise ImportError("OpenCV (cv2) is required to encode JPEG frames.")
+    success, buffer = cv2_mod.imencode(".jpg", image, [int(cv2_mod.IMWRITE_JPEG_QUALITY), quality])
     if not success:
         raise ValueError("Failed to encode frame to JPEG.")
     return buffer.tobytes()
 
 
-def decode_jpeg(data: bytes) -> np.ndarray:
+def decode_jpeg(data: bytes) -> Any:
     """Decode JPEG bytes to OpenCV BGR image."""
-    arr = np.frombuffer(data, dtype=np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    cv2_mod = _get_cv2()
+    np_mod = _get_np()
+    if cv2_mod is None or np_mod is None:
+        raise ImportError("OpenCV (cv2) and NumPy are required to decode JPEG frames.")
+    arr = np_mod.frombuffer(data, dtype=np_mod.uint8)
+    img = cv2_mod.imdecode(arr, cv2_mod.IMREAD_COLOR)
     if img is None:
         raise ValueError("Failed to decode JPEG bytes to image.")
     return img

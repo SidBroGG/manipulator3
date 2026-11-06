@@ -152,7 +152,11 @@ def test_pointing_gesture_discrimination():
 
 def test_hand_tracker_empty_frame():
     """Verify HandTracker behavior on empty/blank image."""
-    tracker = HandTracker()
+    try:
+        tracker = HandTracker()
+    except ImportError:
+        pytest.skip("mediapipe is not installed (thin client environment)")
+
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     lms = tracker.detect_landmarks(blank)
     assert lms is None

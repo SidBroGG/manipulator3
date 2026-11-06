@@ -199,6 +199,8 @@ def run_hand_preview(
             cap.release()
         if not headless:
             cv2.destroyAllWindows()
+            for _ in range(5):
+                cv2.waitKey(1)
 
     elapsed = time.time() - start_time
     fps = frame_count / (elapsed + 1e-6)

@@ -1,13 +1,3 @@
-from manipulator3.model import (
-    MJCF_PATH,
-    SCENE_PATH,
-    URDF_PATH,
-    load_mujoco_model,
-    load_mujoco_scene,
-    load_ikpy_chain,
-    get_gripper_pose,
-    get_tof_reading,
-)
 from manipulator3.protocol import (
     TOPIC_CAMERA_RAW,
     TOPIC_TOF_RANGE,
@@ -24,6 +14,18 @@ from manipulator3.protocol import (
 
 
 def __getattr__(name: str):
+    if name in (
+        "MJCF_PATH",
+        "SCENE_PATH",
+        "URDF_PATH",
+        "load_mujoco_model",
+        "load_mujoco_scene",
+        "load_ikpy_chain",
+        "get_gripper_pose",
+        "get_tof_reading",
+    ):
+        from manipulator3 import model
+        return getattr(model, name)
     if name in ("SimulationEnvironment", "draw_sensor_overlay"):
         from manipulator3 import simulation
         return getattr(simulation, name)
@@ -103,6 +105,34 @@ def __getattr__(name: str):
     ):
         from manipulator3 import state_machine
         return getattr(state_machine, name)
+    if name in (
+        "GPIOBackend",
+        "MockGPIOBackend",
+        "LGPIOBackend",
+        "RPiGPIOBackend",
+        "get_default_gpio_backend",
+        "StepperDriverA4988",
+        "ServoConfig",
+        "ServoController",
+        "ToFReaderVL53L0X",
+        "CameraStreamerOV5647",
+        "PIN_STEP",
+        "PIN_DIR",
+        "PIN_SERVO_SHOULDER_A",
+        "PIN_SERVO_SHOULDER_B",
+        "PIN_SERVO_ELBOW",
+        "PIN_SERVO_WRIST_PITCH",
+        "PIN_SERVO_WRIST_ROLL",
+        "PIN_SERVO_GRIPPER",
+    ):
+        from manipulator3 import hardware
+        return getattr(hardware, name)
+    if name == "ThinClient":
+        from manipulator3 import thin_client
+        return getattr(thin_client, name)
+    if name == "ServoTester":
+        from manipulator3 import servo_tester
+        return getattr(servo_tester, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
