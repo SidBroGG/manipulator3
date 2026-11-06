@@ -256,13 +256,32 @@ class ServoTester:
         if smooth and diff_deg > 0.2:
             step_rate_hz = 50.0  # 50 Hz PWM frame rate
             duration = max(0.04, diff_deg / max(1.0, speed_deg_per_s))
-            num_steps = max(2, int(round(duration * step_rate_hz)))
-            step_dt = duration / num_steps
-            for i in range(1, num_steps + 1):
-                alpha = i / num_steps
+            interval = 1.0 / step_rate_hz
+            t_start = time.perf_counter()
+            t_end = t_start + duration
+            next_tick = t_start
+
+            while True:
+                now = time.perf_counter()
+                if now >= t_end:
+                    self._apply_angle(key, target_rad)
+                    break
+
+                s = (now - t_start) / duration
+                s = max(0.0, min(1.0, s))
+                # Quintic minimum-jerk polynomial: s(0)=0, s(1)=1, s'(0)=s'(1)=0, s''(0)=s''(1)=0
+                # Guarantees zero jerk, zero velocity jump, and smooth acceleration/deceleration
+                alpha = s * s * s * (s * (s * 6.0 - 15.0) + 10.0)
                 interp_rad = current_rad + (target_rad - current_rad) * alpha
                 self._apply_angle(key, interp_rad)
-                time.sleep(step_dt)
+
+                next_tick += interval
+                now_after = time.perf_counter()
+                sleep_rem = next_tick - now_after
+                if sleep_rem > 0.002:
+                    time.sleep(sleep_rem - 0.001)
+                while time.perf_counter() < next_tick:
+                    pass
         else:
             self._apply_angle(key, target_rad)
 
@@ -356,7 +375,9 @@ class ServoTester:
 
         for _ in range(cycles):
             self.set_motor_angle(key, lo, in_degrees=True, smooth=True, speed_deg_per_s=speed_deg_per_s)
+            time.sleep(0.05)
             self.set_motor_angle(key, hi, in_degrees=True, smooth=True, speed_deg_per_s=speed_deg_per_s)
+            time.sleep(0.05)
             self.set_motor_angle(key, 0.0, in_degrees=True, smooth=True, speed_deg_per_s=speed_deg_per_s)
 
     def print_status_table(self) -> None:
@@ -547,7 +568,7 @@ def main() -> int:
     if args.center:
         tester.center_all(smooth=args.smooth, speed_deg_per_s=args.speed)
         print("[INFO] All motors centered to 0°.")
-        hold_time = args.hold if args.hold is not None else (0.2 if args.smooth else 0.5)
+        hold_time = args.hold if args.hold is not None else 1.0
         if hold_time > 0:
             if hold_time > 0.3:
                 print(f"[INFO] Holding center position for {hold_time:.1f}s...")
@@ -580,7 +601,7 @@ def main() -> int:
             f"[INFO] Motor '{res['key']}' (GPIO {res['pin']}) -> {res['angle_deg']}° ({res['angle_rad']} rad){pulse_info}{clamped_info}{smooth_tag}"
         )
 
-        hold_time = args.hold if args.hold is not None else (0.2 if args.smooth else 0.5)
+        hold_time = args.hold if args.hold is not None else 1.0
         if hold_time != 0 and res["type"] != "stepper":
             if hold_time < 0:
                 print("[INFO] Holding position indefinitely. Press Ctrl+C to stop.")

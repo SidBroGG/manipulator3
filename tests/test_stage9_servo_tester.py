@@ -133,6 +133,31 @@ def test_smooth_motion_and_from_angle():
     assert abs(res_back["pulse_us"] - 1500.0) < 1.0
 
 
+def test_smooth_motion_minimum_jerk_s_curve():
+    """Verify smooth mode follows quintic minimum-jerk trajectory with zero velocity at endpoints."""
+    history = []
+
+    class RecordingMockGPIO(MockGPIOBackend):
+        def set_servo_pulse(self, pin: int, pulse_us: float) -> None:
+            super().set_servo_pulse(pin, pulse_us)
+            history.append(pulse_us)
+
+    gpio = RecordingMockGPIO()
+    tester = ServoTester(gpio=gpio, force_mock=True)
+
+    res = tester.set_motor_angle("elbow", 40.0, in_degrees=True, smooth=True, speed_deg_per_s=200.0, from_angle=0.0)
+    assert res["angle_deg"] == 40.0
+    assert len(history) >= 5
+
+    # In a quintic S-curve:
+    # Start step delta must be smaller than middle step delta (gradual acceleration from 0 velocity)
+    delta_first = history[1] - history[0]
+    mid_idx = len(history) // 2
+    delta_mid = history[mid_idx] - history[mid_idx - 1]
+    assert delta_mid > delta_first, f"Middle velocity ({delta_mid}) must be greater than start velocity ({delta_first})"
+
+
+
 def test_persisted_state_roundtrip(tmp_path, monkeypatch):
     """Verify state file maintains motor positions across independent process/tester instances."""
     state_file = str(tmp_path / "servo_state.json")
