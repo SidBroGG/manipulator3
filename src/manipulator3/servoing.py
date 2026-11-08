@@ -16,7 +16,7 @@ JOINT_PITCH = 3  # revolute_4 (wrist pitch)
 
 DEFAULT_JOINT_LIMITS: Dict[int, Tuple[float, float]] = {
     JOINT_YAW: (-3.14159, 3.14159),
-    JOINT_PITCH: (-1.5708, 1.5708),
+    JOINT_PITCH: (-1.5708, 0.0),
 }
 
 
@@ -74,7 +74,7 @@ class VisualServoController:
         self.prev_ev = ev
 
         u_yaw = -(self.k_yaw * eu + self.kd_yaw * de_u) if abs(eu) > self.deadband_norm else 0.0
-        u_pitch = -(self.k_pitch * ev + self.kd_pitch * de_v) if abs(ev) > self.deadband_norm else 0.0
+        u_pitch = (self.k_pitch * ev + self.kd_pitch * de_v) if abs(ev) > self.deadband_norm else 0.0
 
         dq_yaw = float(np.clip(u_yaw, -self.max_step_rad, self.max_step_rad))
         dq_pitch = float(np.clip(u_pitch, -self.max_step_rad, self.max_step_rad))
@@ -227,7 +227,7 @@ class VisualSearchTracker:
         self.active_waypoints = self.scanner.generate_sweep_waypoints(
             azimuth_rad=az,
             span_rad=span,
-            tilt_offsets=[0.0, 0.12],
+            tilt_offsets=[0.0, 0.15],
         )
         self.waypoint_idx = 0
         self.lost_counter = 0

@@ -56,9 +56,12 @@ class SimulationEnvironment:
             scn_opt.geomgroup[0] = 1
             scn_opt.geomgroup[1] = 1
             scn_opt.geomgroup[2] = 0  # Hide mocap marker spheres from robot camera
+            scn_opt.geomgroup[3] = 1  # Robot geoms (excluded from ToF ray mask)
             self.renderer.update_scene(self.data, camera=camera_name, scene_option=scn_opt)
         else:
-            self.renderer.update_scene(self.data, camera=camera_name)
+            scn_opt = mujoco.MjvOption()
+            scn_opt.geomgroup[3] = 1
+            self.renderer.update_scene(self.data, camera=camera_name, scene_option=scn_opt)
         return self.renderer.render()
 
     def render_bgr(self, camera_name: str = "gripper_camera") -> np.ndarray:

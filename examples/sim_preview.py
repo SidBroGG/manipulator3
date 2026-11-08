@@ -66,9 +66,9 @@ def run_preview(
                 # Oscillate between elevated pose and near-table approach pose
                 phase = 0.5 * (1.0 + np.sin(elapsed * 1.2))  # [0, 1]
                 # Pitch shoulder, elbow, wrist towards target cube (camera on top)
-                sim.data.ctrl[act_s] = -0.2 - 0.65 * phase
-                sim.data.ctrl[act_e] = -0.1 - 0.45 * phase
-                sim.data.ctrl[act_w] = 0.2 + 1.25 * phase
+                sim.data.ctrl[act_s] = -0.1 - 0.5 * phase
+                sim.data.ctrl[act_e] = -0.5 - 1.0 * phase
+                sim.data.ctrl[act_w] = -0.4 - 0.8 * phase
                 sim.data.ctrl[act_g] = 0.25 * (1.0 - phase)
 
             # Physics stepping

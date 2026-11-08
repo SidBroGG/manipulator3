@@ -22,7 +22,7 @@ def test_urdf_file_and_ikpy():
     m_urdf = mujoco.MjModel.from_xml_path(str(URDF_PATH))
     assert m_urdf.nbody >= 8
     assert m_urdf.ngeom > 0
-    assert m_urdf.nmesh == 8
+    assert m_urdf.nmesh == 10
 
     # Load in IKPy
     chain = load_ikpy_chain()
@@ -40,6 +40,8 @@ def test_mujoco_mjcf_compilation():
         "shoulder_link",
         "elbow_link",
         "wrist_link",
+        "servo_lower",
+        "claw_base",
         "main__gripperbase",
         "main__gripper1",
         "main__gripper2",
@@ -91,6 +93,7 @@ def test_gripper_mimic_coupling():
 
     q7 = data.qpos[model.joint("revolute_7").qposadr[0]]
     q6 = data.qpos[model.joint("revolute_6").qposadr[0]]
+    assert q7 > 0.2, f"Positive command must open the jaws: q7={q7}"
     assert np.isclose(q6, -q7, atol=0.03), f"Mimic coupling failed: q6={q6}, q7={q7}"
 
 
@@ -105,7 +108,7 @@ def test_forward_kinematics():
     assert pos_home[2] > 0.3  # End-effector elevated vertically
 
     # Displaced pose: pitch shoulder forward
-    data.ctrl[model.actuator("act_revolute_2").id] = 0.5
+    data.ctrl[model.actuator("act_revolute_2").id] = -0.5
     for _ in range(500):
         mujoco.mj_step(model, data)
 

@@ -32,6 +32,8 @@ def verify_geometry() -> bool:
         "shoulder_link",
         "elbow_link",
         "wrist_link",
+        "servo_lower",
+        "claw_base",
         "main__gripperbase",
         "main__gripper1",
         "main__gripper2",
@@ -41,7 +43,7 @@ def verify_geometry() -> bool:
         if b_id < 0:
             logger.error(f"[ERROR] Required body '{b}' missing from model!")
             return False
-    logger.info("[INFO] All 5 arm links and gripper bodies verified.")
+    logger.info("[INFO] All arm, wrist and gripper bodies verified.")
 
     # 3. Verify joints and actuators
     for j in ARM_JOINTS + GRIPPER_JOINTS:
@@ -66,6 +68,9 @@ def verify_geometry() -> bool:
     gripper_base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "main__gripperbase")
     if cam_body_id != gripper_base_id:
         logger.error("[ERROR] Camera is not attached to 'main__gripperbase'!")
+        return False
+    if abs(model.cam_fovy[cam_id] - 48.8) > 0.5:
+        logger.error("[ERROR] Camera FOV mismatch!")
         return False
     logger.info("[INFO] Virtual camera 'gripper_camera' verified on 'main__gripperbase'.")
 

@@ -166,7 +166,7 @@ class PickAndPlaceStateMachine:
         self.active_waypoints = self.scanner.generate_sweep_waypoints(
             azimuth_rad=az,
             span_rad=span,
-            tilt_offsets=[0.38, 0.15],
+            tilt_offsets=[0.0, 0.15],
         )
         self.waypoint_idx = 0
         self.state = ManipulatorState.POINTING_DETECTED

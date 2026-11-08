@@ -59,9 +59,9 @@ def run_zenoh_preview(
             phase = 0.5 * (1.0 + np.sin(elapsed * 1.5))
             cmd_angles = {
                 "act_revolute_1": float(0.3 * np.sin(elapsed * 0.8)),   # base yaw
-                "act_revolute_2": float(-0.2 - 0.5 * phase),             # shoulder
-                "act_revolute_3": float(-0.1 - 0.4 * phase),             # elbow
-                "act_revolute_4": float(0.2 + 1.1 * phase),              # wrist pitch
+                "act_revolute_2": float(-0.1 - 0.5 * phase),             # shoulder
+                "act_revolute_3": float(-0.5 - 1.0 * phase),             # elbow
+                "act_revolute_4": float(-0.4 - 0.8 * phase),             # wrist pitch
                 "act_revolute_5": float(0.0),                            # wrist roll
                 "act_gripper": float(0.25 * (1.0 - phase)),              # gripper jaw
             }

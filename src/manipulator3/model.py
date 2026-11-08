@@ -57,7 +57,7 @@ def load_ikpy_chain(urdf_path: Path | str | None = None) -> ikpy.chain.Chain:
     return ikpy.chain.Chain.from_urdf_file(
         path,
         base_elements=["base_link"],
-        active_links_mask=[False, True, True, True, True, True, False],
+        active_links_mask=[False, True, True, True, True, False, False],
     )
 
 
@@ -79,7 +79,7 @@ def get_tof_reading(model: mujoco.MjModel, data: mujoco.MjData) -> float:
         mat = data.site_xmat[site_id].reshape(3, 3)
         vec = mat[:, 2]
 
-        # Intersect physical surfaces (groups 0 & 1), ignoring group 2 visual markers
+        # Intersect table/object geoms only; robot geoms (group 3) and markers (group 2) are excluded
         geomgroup = np.array([1, 1, 0, 0, 0, 0], dtype=np.uint8)
         body_id = model.site_bodyid[site_id]
         geom_id = np.zeros(1, dtype=np.int32)

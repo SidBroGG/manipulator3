@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 TABLE_Z_MIN = 0.015  # 15 mm above table plane (Z=0)
 REACH_R_MIN = 0.08   # Minimum radial reach from base
 REACH_R_MAX = 0.32   # Maximum radial reach from base
-BASE_HEIGHT_WORLD = 0.066536
+BASE_HEIGHT_WORLD = 0.081
 
 # Baseline joint poses for 5 arm joints (radians)
 POSE_HOME = np.array([0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
-POSE_SCAN = np.array([0.0, -0.1364, -1.2642, 0.9000, 0.0], dtype=np.float64)
-POSE_DROP_OFF = np.array([-1.6814, -0.6843, -1.4092, 0.8270, 0.0], dtype=np.float64)
+POSE_SCAN = np.array([0.0, -0.0440, -1.5060, -1.3220, 0.0], dtype=np.float64)
+POSE_DROP_OFF = np.array([-1.6814, -0.6843, -1.4092, -0.8270, 0.0], dtype=np.float64)
 
 BASELINE_POSES: Dict[str, np.ndarray] = {
     "HOME": POSE_HOME,
@@ -78,11 +78,17 @@ class KinematicsEngine:
         self.q_adrs = [self.model.joint(j).qposadr[0] for j in self.arm_joints]
         self.joint_limits = np.array([self.model.jnt_range[self.model.joint(j).id] for j in self.arm_joints])
 
+        # Position/pose IK uses 4 joints; wrist roll is held at its current value.
+        self.ik_joints = self.arm_joints[:4]
+        self.ik_dofs = self.arm_dofs[:4]
+        self.ik_q_adrs = self.q_adrs[:4]
+        self.ik_limits = self.joint_limits[:4]
+
         # IKPy chain (5 arm links up to main__gripperbase)
         base_chain = load_ikpy_chain(urdf_path)
         self.ikpy_chain = ikpy.chain.Chain(
-            links=base_chain.links[:6],
-            active_links_mask=[False, True, True, True, True, True],
+            links=base_chain.links,
+            active_links_mask=[False, True, True, True, True, False, False],
         )
 
     def check_safety(self, pos: np.ndarray, clamp: bool = False) -> np.ndarray:
@@ -140,20 +146,21 @@ class KinematicsEngine:
         # Base yaw heuristic: revolute_1 rotates around -Z axis
         heuristic_yaw = -float(np.arctan2(target[1], target[0]))
         if initial_guess is None:
-            q_cur = np.array([heuristic_yaw, -0.4, -1.0, 0.8, 0.0], dtype=np.float64)
+            q_cur = np.array([heuristic_yaw, -0.4, -1.0, -0.8, 0.0], dtype=np.float64)
         else:
             q_cur = np.asarray(initial_guess, dtype=np.float64).copy()
+        roll = float(q_cur[4]) if q_cur.shape[0] > 4 else 0.0
 
         # Step 1: Fast IKPy estimation
         target_base = world_to_base_pos(target)
         try:
-            q_ikpy_init = [0.0] + list(q_cur)
+            q_ikpy_init = [0.0] + [float(v) for v in q_cur[:4]] + [roll, 0.0, 0.0]
             q_ikpy_sol = self.ikpy_chain.inverse_kinematics(
                 target_base,
                 initial_position=q_ikpy_init,
                 optimizer_budget=35,
             )
-            q_cand = np.array(q_ikpy_sol[1:], dtype=np.float64)
+            q_cand = np.array([*q_ikpy_sol[1:5], roll], dtype=np.float64)
             pos_cand, _ = self.forward_kinematics(q_cand)
             if np.linalg.norm(target - pos_cand) < tolerance and target_z_axis is None:
                 return q_cand
@@ -175,28 +182,33 @@ class KinematicsEngine:
             cur_pos = self.data.xpos[self.body_id].copy()
             err_p = target - cur_pos
 
+            def _result() -> np.ndarray:
+                q = np.array([self.data.qpos[adr] for adr in self.q_adrs], dtype=np.float64)
+                q[4] = roll
+                return q
+
             if not has_orientation:
                 if np.linalg.norm(err_p) < tolerance:
-                    return np.array([self.data.qpos[adr] for adr in self.q_adrs], dtype=np.float64)
+                    return _result()
             else:
                 cur_mat = self.data.xmat[self.body_id].reshape(3, 3)
                 cur_z = cur_mat[:, 2]
                 err_r = np.cross(cur_z, target_z)
                 if np.linalg.norm(err_p) < tolerance and np.linalg.norm(err_r) < 0.02:
-                    return np.array([self.data.qpos[adr] for adr in self.q_adrs], dtype=np.float64)
+                    return _result()
 
             jacp = np.zeros((3, self.model.nv))
             jacr = np.zeros((3, self.model.nv)) if has_orientation else None
             mujoco.mj_jac(self.model, self.data, jacp, jacr, cur_pos, self.body_id)
 
-            J_p = jacp[:, self.arm_dofs]
+            J_p = jacp[:, self.ik_dofs]
             if not has_orientation:
                 J = J_p
                 err = err_p
                 diag = 1e-4 * np.eye(3)
             else:
                 w_rot = 0.25
-                J_r = jacr[:, self.arm_dofs]
+                J_r = jacr[:, self.ik_dofs]
                 J = np.vstack([J_p, w_rot * J_r])
                 err = np.concatenate([err_p, w_rot * err_r])
                 diag = 1e-4 * np.eye(6)
@@ -208,11 +220,11 @@ class KinematicsEngine:
             if max_step > step_limit:
                 dq = dq * (step_limit / max_step)
 
-            for i, adr in enumerate(self.q_adrs):
+            for i, adr in enumerate(self.ik_q_adrs):
                 self.data.qpos[adr] = np.clip(
                     self.data.qpos[adr] + dq[i],
-                    self.joint_limits[i, 0],
-                    self.joint_limits[i, 1],
+                    self.ik_limits[i, 0],
+                    self.ik_limits[i, 1],
                 )
             mujoco.mj_forward(self.model, self.data)
 
@@ -223,4 +235,4 @@ class KinematicsEngine:
                 f"IK failed to converge to target {target.round(4)}. Error: {final_err*1000:.2f} mm"
             )
 
-        return np.array([self.data.qpos[adr] for adr in self.q_adrs], dtype=np.float64)
+        return _result()

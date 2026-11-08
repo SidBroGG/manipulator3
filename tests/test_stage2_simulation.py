@@ -79,9 +79,9 @@ def test_tof_rangefinder_accuracy_and_approach():
         # Higher angles pitch shoulder and elbow down
         distances = []
         for phase in [0.4, 0.7, 1.0]:
-            sim.data.ctrl[sim.actuator_map["act_revolute_2"]] = -0.2 - 0.65 * phase
-            sim.data.ctrl[sim.actuator_map["act_revolute_3"]] = -0.1 - 0.45 * phase
-            sim.data.ctrl[sim.actuator_map["act_revolute_4"]] = 0.2 + 1.25 * phase
+            sim.data.ctrl[sim.actuator_map["act_revolute_2"]] = -0.1 - 0.2 * phase
+            sim.data.ctrl[sim.actuator_map["act_revolute_3"]] = -0.5 - 1.0 * phase
+            sim.data.ctrl[sim.actuator_map["act_revolute_4"]] = -0.4 - 0.8 * phase
             sim.step(150)
 
             dist = sim.get_tof_reading()
@@ -107,8 +107,9 @@ def test_physics_simulation_stability():
         mid = sim.model.geom_dataid[base_gids[0]]
         vadr = sim.model.mesh_vertadr[mid]
         vnum = sim.model.mesh_vertnum[mid]
-        verts = sim.model.mesh_vert[vadr:vadr + vnum * 3].reshape(-1, 3)
-        base_min_z = sim.data.xpos[base_bid][2] + verts[:, 2].min()
+        verts = sim.model.mesh_vert[vadr:vadr + vnum]
+        world_verts = verts @ sim.data.geom_xmat[base_gids[0]].reshape(3, 3).T + sim.data.geom_xpos[base_gids[0]]
+        base_min_z = world_verts[:, 2].min()
         assert np.isclose(base_min_z, 0.0, atol=1e-3), f"Base not flush with table: z={base_min_z}"
 
 

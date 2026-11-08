@@ -101,7 +101,7 @@ def test_sector_scanner_waypoints():
     for wp in waypoints:
         # Check joint angle within hardware limits
         assert -3.14159 <= wp[0] <= 3.14159
-        assert -1.5708 <= wp[3] <= 1.5708
+        assert -1.5708 <= wp[3] <= 0.0
 
 
 def test_visual_servo_proportional_convergence():
@@ -119,7 +119,7 @@ def test_visual_servo_proportional_convergence():
     for step in range(30):
         # Target error in camera frame relative to current joint
         e_u = float(np.clip((current_q[0] - target_world_yaw) / 0.35, -1.0, 1.0))
-        e_v = float(np.clip((current_q[3] - (POSE_SCAN[3] + target_world_pitch)) / 0.30, -1.0, 1.0))
+        e_v = float(np.clip(((POSE_SCAN[3] + target_world_pitch) - current_q[3]) / 0.30, -1.0, 1.0))
 
         cx = 320.0 + e_u * 320.0
         cy = 240.0 + e_v * 240.0
@@ -149,7 +149,7 @@ def test_simulation_visual_servoing_loop():
         # Start in scan pose facing slightly off-center from red_cube
         q_init = POSE_SCAN.copy()
         q_init[0] = 0.06
-        q_init[3] = 1.30
+        q_init[3] = -1.35
         env.set_actuator_targets(q_init)
         for _ in range(150):
             env.step()

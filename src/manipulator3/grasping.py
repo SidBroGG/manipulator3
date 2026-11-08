@@ -23,12 +23,12 @@ GRIPPER_CONTACT_MIN_RAD: float = -0.40
 GRIPPER_CONTACT_MAX_RAD: float = -0.05
 
 # ToF approach parameters (millimeters and meters)
-TOF_TARGET_MIN_MM: float = 20.0
-TOF_TARGET_MAX_MM: float = 65.0
-TOF_TARGET_NOMINAL_MM: float = 55.0
+TOF_TARGET_MIN_MM: float = 60.0
+TOF_TARGET_MAX_MM: float = 85.0
+TOF_TARGET_NOMINAL_MM: float = 72.0
 
 # Software clearance safety boundary for end-effector during angled approach
-TABLE_CLEARANCE_MIN_EE_Z: float = 0.128
+TABLE_CLEARANCE_MIN_EE_Z: float = 0.050
 PRE_TRANSFER_LIFT_M: float = 0.080
 
 
@@ -98,9 +98,18 @@ class ToFApproachController:
                 tolerance=3e-3,
             )
             return next_q, ApproachStatus.APPROACHING
-        except Exception as e:
-            logger.error("IK failed during ToF approach: %s", e)
-            return current_q.copy(), ApproachStatus.IK_FAILED
+        except Exception:
+            # Near table limits the 4-DOF pose can be infeasible; position IK still advances the gripper.
+            try:
+                next_q = self.kinematics.inverse_kinematics(
+                    target_pos,
+                    initial_guess=current_q,
+                    tolerance=3e-3,
+                )
+                return next_q, ApproachStatus.APPROACHING
+            except Exception as e:
+                logger.error("IK failed during ToF approach: %s", e)
+                return current_q.copy(), ApproachStatus.IK_FAILED
 
     def compute_grasp_pose_from_tof(
         self,
@@ -130,9 +139,17 @@ class ToFApproachController:
                 tolerance=3e-3,
             )
             return grasp_q, ApproachStatus.TARGET_REACHED
-        except Exception as e:
-            logger.error("Failed to solve grasp pose from ToF: %s", e)
-            return current_q.copy(), ApproachStatus.IK_FAILED
+        except Exception:
+            try:
+                grasp_q = self.kinematics.inverse_kinematics(
+                    target_pos,
+                    initial_guess=current_q,
+                    tolerance=3e-3,
+                )
+                return grasp_q, ApproachStatus.TARGET_REACHED
+            except Exception as e:
+                logger.error("Failed to solve grasp pose from ToF: %s", e)
+                return current_q.copy(), ApproachStatus.IK_FAILED
 
 
 class GraspController:

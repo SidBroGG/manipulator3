@@ -33,12 +33,25 @@ def test_forward_kinematics_urdf_mujoco_equivalence(engine):
     test_angles = np.array([-0.35, 0.25, -0.65, 0.45, -0.15], dtype=np.float64)
     pos_mj, mat_mj = engine.forward_kinematics(test_angles)
 
-    q_ikpy = [0.0] + list(test_angles)
+    q_ikpy = [0.0] + list(test_angles[:4]) + [0.0, 0.0]
     T_base = engine.ikpy_chain.forward_kinematics(q_ikpy)
     pos_ikpy_base = T_base[:3, 3]
     pos_ikpy_world = base_to_world_pos(pos_ikpy_base)
 
     assert np.allclose(pos_mj, pos_ikpy_world, atol=1e-5), f"FK mismatch: MuJoCo={pos_mj}, IKPy={pos_ikpy_world}"
+
+
+def test_sensor_pose_independent_of_wrist_roll(engine):
+    """Verify revolute_5 (gripper roll) does not affect the sensor frame."""
+    q_a = POSE_SCAN.copy()
+    q_b = POSE_SCAN.copy()
+    q_b[4] = 0.7
+
+    pos_a, mat_a = engine.forward_kinematics(q_a)
+    pos_b, mat_b = engine.forward_kinematics(q_b)
+
+    assert np.allclose(pos_a, pos_b, atol=1e-6)
+    assert np.allclose(mat_a, mat_b, atol=1e-6)
 
 
 def test_inverse_kinematics_table_grid(engine):

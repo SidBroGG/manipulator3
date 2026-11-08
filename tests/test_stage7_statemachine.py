@@ -37,8 +37,8 @@ def test_tof_approach_controller_step_and_thresholds():
     approach = ToFApproachController(ke)
 
     assert approach.is_at_grasp_distance(TOF_TARGET_NOMINAL_MM) is True
-    assert approach.is_at_grasp_distance(30.0) is True
-    assert approach.is_at_grasp_distance(15.0) is False
+    assert approach.is_at_grasp_distance(70.0) is True
+    assert approach.is_at_grasp_distance(40.0) is False
     assert approach.is_at_grasp_distance(120.0) is False
 
     # Out of range test
@@ -60,7 +60,7 @@ def test_tof_approach_controller_step_and_thresholds():
     assert cos_sim > 0.95
 
     # Target reached threshold test
-    q_reached, status_reached = approach.compute_approach_step(q_scan, tof_mm=32.0)
+    q_reached, status_reached = approach.compute_approach_step(q_scan, tof_mm=70.0)
     assert status_reached == ApproachStatus.TARGET_REACHED
     assert np.allclose(q_reached, q_scan)
 
@@ -156,7 +156,7 @@ def test_state_machine_transitions():
     assert sm.state == ManipulatorState.TOF_APPROACH
 
     # Approach until target ToF distance -> GRASP
-    out = sm.step(frame=frame, tof_mm=34.0)
+    out = sm.step(frame=frame, tof_mm=70.0)
     assert out.state == ManipulatorState.GRASP
     assert sm.commanded_gripper == GRIPPER_GRASP_CMD
 

@@ -6,75 +6,130 @@
   <default>
     <joint damping="0.1" armature="0.01"/>
     <default class="visual">
-      <geom group="1" type="mesh" contype="0" conaffinity="0" density="1050" rgba="0.65 0.65 0.65 1.0"/>
+      <geom group="3" type="mesh" contype="0" conaffinity="0" density="1050" rgba="0.65 0.65 0.65 1.0"/>
+    </default>
+    <default class="decor">
+      <geom group="3" type="mesh" contype="0" conaffinity="0" density="0" rgba="0.65 0.65 0.65 1.0"/>
     </default>
     <default class="collision">
-      <geom group="0" type="mesh" contype="1" conaffinity="1" density="1050" rgba="0.8 0.2 0.2 0.0" friction="1.0 0.05 0.001"/>
+      <geom group="3" type="mesh" contype="1" conaffinity="1" density="1050" rgba="0.8 0.2 0.2 0.0" friction="1.0 0.05 0.001"/>
     </default>
     <default class="gripper_finger">
-      <!-- PVC electrical tape over 3D-printed plastic: realistic sliding friction (0.95) with thin compliance (solref=0.008 1) -->
-      <geom group="0" type="mesh" contype="1" conaffinity="1" condim="4" density="1050" rgba="0.65 0.65 0.65 1.0" friction="0.95 0.08 0.002" solref="0.008 1" solimp="0.95 0.99 0.001 0.5 2"/>
+      <geom group="3" type="mesh" contype="1" conaffinity="1" condim="4" density="1050" rgba="0.65 0.65 0.65 1.0" friction="0.95 0.08 0.002" solref="0.008 1" solimp="0.95 0.99 0.001 0.5 2"/>
     </default>
   </default>
 
   <asset>
-    <mesh name="base_stand" file="base_stand.stl"/>
-    <mesh name="base_spinning" file="base_spinning.stl"/>
-    <mesh name="shoulder" file="shoulder.stl"/>
-    <mesh name="elbow" file="elbow.stl"/>
-    <mesh name="wrist" file="wrist.stl"/>
-    <mesh name="gripper_base" file="gripper_base.stl"/>
-    <mesh name="gripper_finger1" file="gripper_finger1.stl"/>
-    <mesh name="gripper_finger2" file="gripper_finger2.stl"/>
+    <mesh name="base_link" file="RoboticHandMain-base_link.stl"/>
+    <mesh name="link_1" file="RoboticHandMain-link_1.stl"/>
+    <mesh name="link_2" file="RoboticHandMain-link_2.stl"/>
+    <mesh name="link_3" file="RoboticHandMain-link_3.stl"/>
+    <mesh name="wrist_mount" file="RoboticHandMain-wrist_mount.stl"/>
+    <mesh name="servo_lower" file="RoboticHandMain-servo_lower.stl"/>
+    <mesh name="claw_base" file="RoboticHandMain-claw_base.stl"/>
+    <mesh name="claw_base_collision" file="RoboticHandMain-claw_base-collision.stl"/>
+    <mesh name="claw_lower" file="RoboticHandMain-claw_lower.stl"/>
+    <mesh name="claw_upper" file="RoboticHandMain-claw_upper.stl"/>
+    <mesh name="gear_lower" file="RoboticHandMain-gear_lower.stl"/>
+    <mesh name="gear_upper" file="RoboticHandMain-gear_upper.stl"/>
+    <mesh name="connector_lower" file="RoboticHandMain-connector_lower.stl"/>
+    <mesh name="connector_upper" file="RoboticHandMain-connector_upper.stl"/>
+    <mesh name="mg996R_v2_1" file="RoboticHandMain-mg996R_v2_step__1_.stl"/>
+    <mesh name="mg996R_v2_2" file="RoboticHandMain-mg996R_v2_step.stl"/>
+    <mesh name="mg996R_v2_3" file="RoboticHandMain-mg996R_v2_step__1__2.stl"/>
+    <mesh name="mg996R_v2_4" file="RoboticHandMain-mg996R_v2_step__2_.stl"/>
+    <mesh name="mg996_arm_1" file="RoboticHandMain-mg996_arm_6pad_step__1_.stl"/>
+    <mesh name="mg996_arm_2" file="RoboticHandMain-mg996_arm_6pad_step.stl"/>
+    <mesh name="mg996_arm_3" file="RoboticHandMain-mg996_arm_6pad_step__1__2.stl"/>
+    <mesh name="mg996_arm_4" file="RoboticHandMain-mg996_arm_6pad_step__2_.stl"/>
+    <mesh name="rpi_cam" file="RoboticHandMain-RPi_cam_Rev_1_3_SLDPRT__1_.stl"/>
+    <mesh name="base_part_1" file="RoboticHandMain-____________.stl"/>
+    <mesh name="base_part_2" file="RoboticHandMain-_____________.stl"/>
+    <mesh name="base_part_3" file="RoboticHandMain-______________.stl"/>
   </asset>
 
   <worldbody>
-    <body name="base_link" pos="0 0 0.066536" euler="0 0 3.14159265">
-      <geom class="visual" mesh="base_stand"/>
-      <geom class="collision" mesh="base_stand"/>
+    <body name="base_link" pos="0 0 0.081" quat="0 0 0 1">
+      <inertial pos="-0.000305146 -0.000051946 -0.054561587" mass="0.16482215" fullinertia="3.9743640e-4 3.9146050e-4 5.8876384e-4 5.0153724e-7 4.4158388e-7 -1.7926083e-7"/>
+      <geom class="visual" mesh="base_link"/>
+      <geom class="collision" mesh="base_link"/>
 
-      <body name="base_spinning" pos="0 0 0.013">
+      <body name="base_spinning" pos="0 0 0" quat="0.70710678 0 0 0.70710678">
+        <inertial pos="-3.467758e-6 -6.502503e-6 0.016107198" mass="0.021598436" fullinertia="4.4140368e-5 4.4140268e-5 8.7968010e-5 -2.5946322e-9 -6.1123254e-10 1.1269472e-10"/>
         <joint name="revolute_1" type="hinge" axis="0 0 -1" range="-3.14159 3.14159"/>
-        <geom class="visual" mesh="base_spinning" pos="-3.236e-48 6.8544e-17 -0.014"/>
-        <geom class="collision" mesh="base_spinning" pos="-3.236e-48 6.8544e-17 -0.014"/>
+        <geom class="visual" mesh="link_1" quat="0.70710678 0 0 -0.70710678"/>
+        <geom class="collision" mesh="link_1" quat="0.70710678 0 0 -0.70710678"/>
+        <geom class="decor" mesh="mg996R_v2_1" quat="0.70710678 0 0 -0.70710678"/>
+        <geom class="decor" mesh="mg996R_v2_2" quat="0.70710678 0 0 -0.70710678"/>
+        <geom class="decor" mesh="base_part_1" quat="0.70710678 0 0 -0.70710678"/>
+        <geom class="decor" mesh="base_part_2" quat="0.70710678 0 0 -0.70710678"/>
+        <geom class="decor" mesh="base_part_3" quat="0.70710678 0 0 -0.70710678"/>
 
-        <body name="shoulder_link" pos="-0.00153435 0.010669 0.043598">
-          <joint name="revolute_2" type="hinge" axis="0 1 0" range="-1.5708 1.5708"/>
-          <geom class="visual" mesh="shoulder" pos="0.0002 -0.010669 -0.057969"/>
-          <geom class="collision" mesh="shoulder" pos="0.0002 -0.010669 -0.057969"/>
+        <body name="shoulder_link" pos="-0.010269043929 0.0002 0.064969043929" quat="0.70710678 0 0.70710678 0">
+          <inertial pos="-0.054289743 -0.000200945 0.011401573" mass="0.121518664" fullinertia="7.9685886e-5 2.4273927e-4 2.5391391e-4 5.7636777e-8 5.7089160e-6 -2.6654766e-7"/>
+          <joint name="revolute_2" type="hinge" axis="0 0 1" range="-1.5708 0.0"/>
+          <geom class="visual" mesh="link_2" pos="0.064969043929 -0.0002 0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+          <geom class="collision" mesh="link_2" pos="0.064969043929 -0.0002 0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+          <geom class="decor" mesh="mg996R_v2_3" pos="0.064969043929 -0.0002 0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+          <geom class="decor" mesh="mg996_arm_1" pos="0.064969043929 -0.0002 0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+          <geom class="decor" mesh="mg996_arm_2" pos="0.064969043929 -0.0002 0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
 
-          <body name="elbow_link" pos="0 0 0.117">
-            <joint name="revolute_3" type="hinge" axis="0 1 0" range="-1.5708 1.5708"/>
-            <geom class="visual" mesh="elbow" pos="0.0002 -0.010669 -0.174969"/>
-            <geom class="collision" mesh="elbow" pos="0.0002 -0.010669 -0.174969"/>
+          <body name="elbow_link" pos="-0.117 -0.0002 0.020538" quat="1 0 0 0">
+            <inertial pos="-0.054289743 -0.000200945 0.011401573" mass="0.121518664" fullinertia="7.9685886e-5 2.4273927e-4 2.5391391e-4 5.7636777e-8 5.7089160e-6 -2.6654766e-7"/>
+            <joint name="revolute_3" type="hinge" axis="0 0 1" range="-1.5708 0.0"/>
+            <geom class="visual" mesh="link_3" pos="0.181969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+            <geom class="collision" mesh="link_3" pos="0.181969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+            <geom class="decor" mesh="mg996R_v2_4" pos="0.181969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+            <geom class="decor" mesh="mg996_arm_3" pos="0.181969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
 
-            <body name="wrist_link" pos="-7.67294e-05 -0.0207719 0.117514">
-              <joint name="revolute_4" type="hinge" axis="0 -1 0" range="-1.5708 1.5708"/>
-              <geom class="visual" mesh="wrist" pos="-0.000223271 0.0100928 -0.289483"/>
-              <geom class="collision" mesh="wrist" pos="-0.000223271 0.0100928 -0.289483"/>
+            <body name="wrist_link" pos="-0.119 0 0" quat="1 0 0 0">
+              <inertial pos="0.306 0 -0.005" mass="0.065" diaginertia="5.6e-5 9.3e-5 4.5e-5"/>
+              <joint name="revolute_4" type="hinge" axis="0 0 1" range="-1.5708 0.0"/>
+              <geom class="visual" mesh="wrist_mount" pos="0.300969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+              <geom class="collision" mesh="wrist_mount" pos="0.300969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+              <geom class="decor" mesh="mg996_arm_4" pos="0.300969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
+              <geom class="decor" mesh="rpi_cam" pos="0.300969043929 -0.0002 -0.010269043929" quat="0.5 -0.5 -0.5 0.5"/>
 
-              <body name="main__gripperbase" pos="-0.0127233 0.0100928 0.0740668">
-                <joint name="revolute_5" type="hinge" axis="0 0 -1" range="-1.5708 1.5708"/>
-                <geom class="visual" mesh="gripper_base" pos="0.013 0 -0.3665"/>
-                <geom class="collision" mesh="gripper_base" pos="0.013 0 -0.3665"/>
+              <body name="servo_lower" pos="0.300969043929 -0.0002 -0.010269043929" quat="0.5 0.5 -0.5 -0.5">
+                <inertial pos="-0.019383078 4.118e-7 0.36261532" mass="0.0098433621" fullinertia="9.3656793e-7 1.2114366e-6 6.5003698e-7 -2.5055443e-10 -1.0695061e-8 -9.5394946e-12"/>
+                <geom class="visual" mesh="servo_lower"/>
+                <geom class="collision" mesh="servo_lower"/>
 
-                <!-- OV5647 Camera (62.2 deg horizontal FOV, mounted on top of gripper) -->
-                <camera name="gripper_camera" pos="0 0 0.048" xyaxes="0 -1 0 -1 0 0" fovy="48.8"/>
-
-
-                <!-- VL53L0X ToF rangefinder site (pointing +Z along gripper approach axis) -->
-                <site name="tof_site" pos="0 0 0.048" size="0.004" rgba="1 0 0 0.8"/>
-
-                <!-- Gripper jaw 2 (mimicked) -->
-                <body name="main__gripper2" pos="-0.0042323 -0.00744957 0.0355">
-                  <joint name="revolute_6" type="hinge" axis="-1 0 0" range="-0.6 0.6"/>
-                  <geom class="gripper_finger" mesh="gripper_finger2" pos="0.0170823 0.00745048 -0.402"/>
+                <body name="main__gripperbase" pos="-0.013 0 0.376" quat="0.70710678 0 0 0.70710678">
+                  <inertial pos="0 0 0" mass="0.000001" diaginertia="1e-12 1e-12 1e-12"/>
+                  <camera name="gripper_camera" pos="0 0 0.08" xyaxes="-1 0 0 0 1 0" fovy="48.8"/>
+                  <site name="tof_site" pos="0 0 0.048" size="0.004" rgba="1 0 0 0.8"/>
                 </body>
 
-                <!-- Gripper jaw 1 (actuated) -->
-                <body name="main__gripper1" pos="-0.0041294 0.00955012 0.0355">
-                  <joint name="revolute_7" type="hinge" axis="-1 0 0" range="-0.6 0.6"/>
-                  <geom class="gripper_finger" mesh="gripper_finger1" pos="0.0171294 -0.00955012 -0.402"/>
+                <body name="claw_base" pos="-0.013 0 0.376" quat="0.70710678 0 0 0.70710678">
+                  <inertial pos="0.008050303 0.002456633 0.036282026" mass="0.000672899" fullinertia="1.1711975e-8 4.4704883e-9 1.1711937e-8 -5.0151317e-15 -9.1476250e-16 1.2075449e-16"/>
+                  <joint name="revolute_5" type="hinge" axis="0 0 1" range="-1.5708 1.5708"/>
+                  <geom class="visual" mesh="claw_base" pos="-0.00032141686081884447 0.008906626151124503 0.03914018114135246" quat="0 0.69854453 0 -0.71556658"/>
+                  <geom class="collision" mesh="claw_base_collision" pos="-0.00032141686081884447 0.008906626151124503 0.03914018114135246" quat="0 0.69854453 0 -0.71556658"/>
+                  <geom class="decor" mesh="connector_lower" pos="0.006365719517463569 -0.007996499342538143 0.054939737367586304" quat="0.70623132 -0.70787615 -0.00991481 -0.00709742"/>
+                  <geom class="decor" mesh="connector_upper" pos="-0.006194084251909789 -0.008046625467956625 0.05493985453850741" quat="0.00992231 -0.00709622 -0.70791002 -0.70619728"/>
+
+                  <body name="gear_lower" pos="0.00832969614492209 -0.003981156508195392 0.03705015749291658" quat="0.70623132 -0.70787615 -0.00991481 -0.00709742">
+                    <inertial pos="0.019821497 -0.005649360 0.000265552" mass="0.0024394686" fullinertia="8.5643473e-8 7.2553178e-7 8.0468230e-7 1.9726691e-7 4.9045195e-9 -1.4206984e-9"/>
+                    <geom class="decor" mesh="gear_lower"/>
+
+                    <body name="main__gripper2" pos="0.04739760338178221 -0.015954163006239527 -0.0038499978484936364" quat="1 0 0 0">
+                      <inertial pos="-0.011145344 -0.042380168 0.001852983" mass="0.0091154311" fullinertia="4.1374991e-6 6.6116266e-7 4.5747645e-6 -1.1561827e-6 -9.9587104e-10 -4.6564668e-9"/>
+                      <joint name="revolute_6" type="hinge" axis="0 0 -1" range="-0.6 0.6"/>
+                      <geom class="gripper_finger" mesh="claw_lower" pos="-0.056104015848389505 0.011737343921369813 0.017109223122559483" quat="0.49464539 -0.49147099 -0.50646452 0.50722371"/>
+                    </body>
+                  </body>
+
+                  <body name="gear_upper" pos="-0.008190371663916843 -0.004047086017022933 0.037050309526152146" quat="0.00992231 -0.00709622 -0.70791002 -0.70619728">
+                    <inertial pos="0.018031801 0.006081684 -0.001939795" mass="0.0027008908" fullinertia="1.1441459e-7 7.6922918e-7 8.7642618e-7 -2.4826147e-7 -2.4099161e-9 -7.2011644e-10"/>
+                    <geom class="decor" mesh="gear_upper"/>
+
+                    <body name="main__gripper1" pos="0.04739760186630935 0.015954166769932842 -0.0038499999999999945" quat="1 0 0 0">
+                      <inertial pos="-0.011134963 0.042388720 0.001853433" mass="0.0091154311" fullinertia="4.1384351e-6 6.6027304e-7 4.5747181e-6 1.1547658e-6 -4.5826312e-9 1.4247173e-8"/>
+                      <joint name="revolute_7" type="hinge" axis="0 0 -1" range="-0.6 0.6"/>
+                      <geom class="gripper_finger" mesh="claw_upper" pos="-0.05526530027459824 -0.013643573186512981 0.0167669327258795" quat="0.50037414 -0.49962558 0.49838807 -0.50160675"/>
+                    </body>
+                  </body>
                 </body>
               </body>
             </body>
@@ -90,9 +145,9 @@
 
   <actuator>
     <position name="act_revolute_1" joint="revolute_1" kp="50" kv="2" ctrlrange="-3.14159 3.14159"/>
-    <position name="act_revolute_2" joint="revolute_2" kp="60" kv="3" ctrlrange="-1.5708 1.5708"/>
-    <position name="act_revolute_3" joint="revolute_3" kp="45" kv="2" ctrlrange="-1.5708 1.5708"/>
-    <position name="act_revolute_4" joint="revolute_4" kp="15" kv="1" ctrlrange="-1.5708 1.5708"/>
+    <position name="act_revolute_2" joint="revolute_2" kp="80" kv="3" ctrlrange="-1.5708 0.0"/>
+    <position name="act_revolute_3" joint="revolute_3" kp="60" kv="2" ctrlrange="-1.5708 0.0"/>
+    <position name="act_revolute_4" joint="revolute_4" kp="20" kv="1" ctrlrange="-1.5708 0.0"/>
     <position name="act_revolute_5" joint="revolute_5" kp="10" kv="0.5" ctrlrange="-1.5708 1.5708"/>
     <position name="act_gripper" joint="revolute_7" kp="30" kv="1.5" ctrlrange="-0.6 0.6" forcerange="-1.5 1.5"/>
   </actuator>
@@ -104,5 +159,7 @@
   <contact>
     <exclude body1="base_link" body2="base_spinning"/>
     <exclude body1="main__gripper1" body2="main__gripper2"/>
+    <exclude body1="main__gripper1" body2="claw_base"/>
+    <exclude body1="main__gripper2" body2="claw_base"/>
   </contact>
 </mujoco>
